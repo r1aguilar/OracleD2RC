@@ -1,0 +1,86 @@
+name: Super Linter
+
+on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'     
+        required: true
+        default: 'warning'
+      tags:
+        description: 'Test scenario tags' 
+  push:
+    branches: null
+
+jobs:
+  super-lint:
+    name: Lint code base
+    runs-on: ubuntu-latest
+    steps:       
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          # Full git history is needed to get a proper list of changed files
+          fetch-depth: 0
+
+      - name: Selenium Test
+        continue-on-error: true
+        run: |
+          pip install -U selenium
+          pip install -U pytest
+          pip install -U pytest-html
+          pip install -U webdriver-manager
+          pytest test1.py --html=report.html.
+          cat report.html
+
+      - name: Path
+        continue-on-error: true
+        run: |
+          sudo mkdir -p /action/lib/.automation/
+          sudo chown -R runner:docker /action
+          pwd
+          ls -l
+          echo "root /"
+          ls -l /
+          cp java_checks.xml /action/lib/.automation/
+          echo ".automation"
+          ls -l /action/lib/.automation/
+
+      - name:   Java checks
+        continue-on-error: true
+        run: |
+          ls -l /
+          (cd /action/lib/.automation/; readlink -f java_checks.xml)
+
+      - name: Run Super-Linter
+        uses: github/super-linter@v6
+        env:
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: true
+          VALIDATE_KUBERNETES_KUBECONFORM: false
+          VALIDATE_SHELL_SHFMT: false
+          VALIDATE_CSS: false
+          VALIDATE_CSS_PRETTIER: false
+          VALIDATE_GITLEAKS: false
+          VALIDATE_JAVASCRIPT_STANDARD: false
+          VALIDATE_JSCPD: false
+          VALIDATE_NATURAL_LANGUAGE: false
+          VALIDATE_MARKDOWN: false
+          VALIDATE_PYTHON_BLACK: false
+          VALIDATE_PYTHON_FLAKE8: false
+          VALIDATE_PYTHON_ISORT: false
+          VALIDATE_PYTHON_RUFF: false
+          VALIDATE_TERRAFORM_TFLINT: false
+          VALIDATE_TERRAFORM_FMT: false
+          VALIDATE_GOOGLE_JAVA_FORMAT: false
+          VALIDATE_YAML: false
+          VALIDATE_YAML_PRETTIER: false
+          BASH_SEVERITY: warning
+          JAVA_FILE_NAME: google_checks.xml
+          VALIDATE_BASH_EXEC: false
+          VALIDATE_BASH: false
+          VALIDATE_KUBEVAL: false
+          VALIDATE_CHECKOV: false
+          VALIDATE_PYTHON_PYLINT: false
+
