@@ -264,7 +264,7 @@ public class BotController extends TelegramLongPollingBot {
 	}
 
 	private void loginChatbot(long chatId, Update update){
-		BotHelper.sendMessageToTelegram(chatId, "Obteniendo tu información de inicio de sesión ... ", this);
+		BotHelper.sendMessageToTelegram(chatId, "Searching for login information ... ", this);
 		long telegramId = update.getMessage().getFrom().getId();
 		Usuario usuario = usuarioService.getItemByTelegramId(telegramId).getBody();
 
@@ -279,14 +279,14 @@ public class BotController extends TelegramLongPollingBot {
 			// Pedir información del usuario
 			SendMessage message = new SendMessage();
 			message.setChatId(chatId);
-			message.setText("Por favor, comparte tu número de teléfono para continuar.");
+			message.setText("Please share you contact information to continue");
 
 			ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
 			keyboardMarkup.setResizeKeyboard(true);
 			List<KeyboardRow> keyboard = new ArrayList<>();
 
 			KeyboardRow row = new KeyboardRow();
-			KeyboardButton shareContactButton = new KeyboardButton("Compartir número de teléfono");
+			KeyboardButton shareContactButton = new KeyboardButton("Share your phone number");
 			shareContactButton.setRequestContact(true);
 			row.add(shareContactButton);
 			keyboard.add(row);
@@ -308,7 +308,7 @@ public class BotController extends TelegramLongPollingBot {
 			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
 			List<InlineKeyboardButton> titleRow = new ArrayList<>();
 			InlineKeyboardButton sprintTitleButton = new InlineKeyboardButton();
-			sprintTitleButton.setText("Mostrar por Sprint");
+			sprintTitleButton.setText("Filter by Sprint");
 			sprintTitleButton.setCallbackData("NO_ACTION");
 			titleRow.add(sprintTitleButton);
 			rowsInline.add(titleRow);
@@ -335,10 +335,17 @@ public class BotController extends TelegramLongPollingBot {
 							rowsInline.add(rowInline);
 						}
 
+						List<InlineKeyboardButton> allTasksRow = new ArrayList<>();
+						InlineKeyboardButton allTasksButton = new InlineKeyboardButton();
+						allTasksButton.setText("View All Tasks");
+						allTasksButton.setCallbackData("VIEW_ALL_TASKS_FOR_UPDATE");
+						allTasksRow.add(allTasksButton);
+						rowsInline.add(allTasksRow);
+
 						List<InlineKeyboardButton> lastRow = new ArrayList<>();
 						InlineKeyboardButton lastButton = new InlineKeyboardButton();
-						lastButton.setText("View All Tasks");
-						lastButton.setCallbackData("VIEW_ALL_TASKS_FOR_UPDATE");
+						lastButton.setText("Back to developer main menu");
+						lastButton.setCallbackData("BACK_TO_DEVELOPER_MAIN_MENU");
 						lastRow.add(lastButton);
 						rowsInline.add(lastRow);
 					}
@@ -348,7 +355,7 @@ public class BotController extends TelegramLongPollingBot {
 			inlineKeyboardMarkup.setKeyboard(rowsInline);
 			SendMessage messageToTelegram = new SendMessage();
 			messageToTelegram.setChatId(chatId);
-			messageToTelegram.setText("Selecciona un sprint para filtar las tareas o mostrar todas las tareas asignadas no terminadas");
+			messageToTelegram.setText("Select an sprint to filter tasks or show all assigned tasks");
 			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
 			execute(messageToTelegram);
 		} catch (TelegramApiException e) {
@@ -360,7 +367,7 @@ public class BotController extends TelegramLongPollingBot {
 		try {
 			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
 			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
-			String sprintName = "No asignado";
+			String sprintName = "Not assigned";
 			if(tarea.getIdSprint() != 0){
 				ResponseEntity<Sprints> sprint = sprintsService.getItemById(tarea.getIdSprint());
 				if(sprint.getBody() != null){
@@ -370,12 +377,12 @@ public class BotController extends TelegramLongPollingBot {
 	
 			String[][] fields = {
 				{"Name", tarea.getNombre()},
-				{"Description", tarea.getDescripcion() != null ? tarea.getDescripcion() : "Sin Descripcion"},
-				{"Priority", tarea.getPrioridad() != 0 ? String.valueOf(tarea.getPrioridad()) : "No Prioridad"},
+				{"Description", tarea.getDescripcion() != null ? tarea.getDescripcion() : "No Description"},
+				{"Priority", tarea.getPrioridad() != 0 ? String.valueOf(tarea.getPrioridad()) : "No Priority"},
 				{"Sprint", sprintName},
-				{"Due date", tarea.getFechaVencimiento() != null ? String.valueOf(tarea.getFechaVencimiento()).substring(0, 10) : "Sin Fecha"},
-				{"Story Points", tarea.getStoryPoints() != 0 ? String.valueOf(tarea.getStoryPoints()) : "Sin Story Points"},
-				{"Estimated Time", tarea.getTiempoReal() != null ? tarea.getTiempoReal() : "Sin Tiempo Estimado"}
+				{"Due date", tarea.getFechaVencimiento() != null ? String.valueOf(tarea.getFechaVencimiento()).substring(0, 10) : "No Due Date"},
+				{"Story Points", tarea.getStoryPoints() != 0 ? String.valueOf(tarea.getStoryPoints()) : "No Story Points"},
+				{"Estimated Time", tarea.getTiempoReal() != null ? tarea.getTiempoReal() : "No Estimated Time"}
 			};
 	
 			for (String[] field : fields) {
@@ -402,13 +409,13 @@ public class BotController extends TelegramLongPollingBot {
 			// Botón de aceptar tarea
 			List<InlineKeyboardButton> acceptRow = new ArrayList<>();
 			InlineKeyboardButton acceptButton = new InlineKeyboardButton();
-			acceptButton.setText("Aceptar");
+			acceptButton.setText("Accept Task");
 			acceptButton.setCallbackData("CONFIRM_ACCEPT_TASK " + tarea.getIdTarea());
 			acceptRow.add(acceptButton);
 	
 			// Botón de regresar
 			InlineKeyboardButton backButton = new InlineKeyboardButton();
-			backButton.setText("Regresar");
+			backButton.setText("Go back");
 			backButton.setCallbackData("BACK_TO_NOT_ACCEPTED_TASKS " + tarea.getIdProyecto());
 			acceptRow.add(backButton);
 	
@@ -418,11 +425,11 @@ public class BotController extends TelegramLongPollingBot {
 	
 			SendMessage messageToTelegram = new SendMessage();
 			messageToTelegram.setChatId(chatId);
-			messageToTelegram.setText("Selecciona el campo que deseas modificar:");
+			messageToTelegram.setText("Select the field to modify:");
 			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
 			execute(messageToTelegram);
 		} catch (TelegramApiException e) {
-			logger.error("Error mostrando el menú de modificación de tareas", e);
+			logger.error("Error showing the task modification menu", e);
 		}
 	}
 
@@ -442,7 +449,7 @@ public class BotController extends TelegramLongPollingBot {
 				List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
 				List<InlineKeyboardButton> titleRow = new ArrayList<>();
 				InlineKeyboardButton titleButton = new InlineKeyboardButton();
-				titleButton.setText("Lista De Sprints del Proyecto");
+				titleButton.setText("Project Sprints");
 				titleButton.setCallbackData("NO_ACTION ");
 				rowsInline.add(titleRow);
 	
@@ -458,7 +465,7 @@ public class BotController extends TelegramLongPollingBot {
 				// Botón de regresar
 				List<InlineKeyboardButton> backRow = new ArrayList<>();
 				InlineKeyboardButton backButton = new InlineKeyboardButton();
-				backButton.setText("Regresar");
+				backButton.setText("Go back");
 				backButton.setCallbackData("BACK_TO_TASK_MODIFICATION " + idTarea);
 				backRow.add(backButton);
 				rowsInline.add(backRow);
@@ -468,14 +475,14 @@ public class BotController extends TelegramLongPollingBot {
 				// Enviar el mensaje con los sprints
 				SendMessage messageToTelegram = new SendMessage();
 				messageToTelegram.setChatId(chatId);
-				messageToTelegram.setText("Selecciona un sprint:");
+				messageToTelegram.setText("Select a sprint:");
 				messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
 				execute(messageToTelegram);
 			} else {
-				BotHelper.sendMessageToTelegram(chatId, "No se encontró la tarea con ID: " + idTarea, this);
+				BotHelper.sendMessageToTelegram(chatId, "No task found with id: " + idTarea, this);
 			}
 		} catch (TelegramApiException e) {
-			logger.error("Error mostrando el menú de selección de sprints", e);
+			logger.error("Error showing sprint selection menu", e);
 		}
 	}
 
@@ -505,7 +512,7 @@ public class BotController extends TelegramLongPollingBot {
 			// Botón de regresar al menú principal
 			List<InlineKeyboardButton> backRow = new ArrayList<>();
 			InlineKeyboardButton backButton = new InlineKeyboardButton();
-			backButton.setText("Menú Principal");
+			backButton.setText("Main Menu");
 			backButton.setCallbackData("BACK_TO_MANAGER_MAIN_MENU");
 			backRow.add(backButton);
 	
@@ -515,11 +522,11 @@ public class BotController extends TelegramLongPollingBot {
 	
 			SendMessage messageToTelegram = new SendMessage();
 			messageToTelegram.setChatId(chatId);
-			messageToTelegram.setText("Selecciona el campo que deseas modificar:");
+			messageToTelegram.setText("Select the field to modify:");
 			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
 			execute(messageToTelegram);
 		} catch (TelegramApiException e) {
-			logger.error("Error mostrando el menú de modificación de proyectos", e);
+			logger.error("Error showing project modification menu", e);
 		}
 	}
 
@@ -538,15 +545,15 @@ public class BotController extends TelegramLongPollingBot {
 					// Guardar el menú anterior
 					chatPreviousMenuMap.put(chatId, "SHOW_NOT_ACCEPTED_TASKS");
 	
-					BotHelper.sendMessageToTelegram(chatId, "Has seleccionado la tarea: " + tareaNombre + ".\n\nPor favor selecciona todos los campos que desees modificar antes de aceptar la tarea.\n\nCuando desees aceptar la tarea, haz clic en el botón de Aceptar.", this);
+					BotHelper.sendMessageToTelegram(chatId, "Task selected: " + tareaNombre + ".\n\nPlease select all the fields you want to modify before accepting the task.\n\nWhen you are done editing the task, click on Accept", this);
 	
 					// Mostrar el menú de modificación de la tarea
 					showTaskModificationMenu(chatId, tarea);
 				} else {
-					BotHelper.sendMessageToTelegram(chatId, "No se encontró la tarea con ID: " + tareaId, this);
+					BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + tareaId, this);
 				}
 			} catch (Exception e) {
-				logger.error("Error obteniendo la tarea seleccionada", e);
+				logger.error("Error obtaining selected task", e);
 			}
 		} else if (callbackData.startsWith("UPDATE_TASK_")) {
 
@@ -600,7 +607,7 @@ public class BotController extends TelegramLongPollingBot {
 			saveChatState(chatId, "WAITING_FOR_PROJECT_FIELD_" + field, proyectoId);
 	
 			// Enviar un mensaje solicitando el nuevo valor para el campo
-			BotHelper.sendMessageToTelegram(chatId, "Por favor, escribe el nuevo valor para " + field, this);
+			BotHelper.sendMessageToTelegram(chatId, "Please write the new value for " + field, this);
 		} else if (callbackData.startsWith("CONFIRM_ACCEPT_TASK")) {
 			int tareaId = Integer.parseInt(callbackData.replace("CONFIRM_ACCEPT_TASK ", ""));
 	
@@ -613,7 +620,7 @@ public class BotController extends TelegramLongPollingBot {
 				tareaService.updateTarea(tareaId, tarea);
 	
 				// Enviar un mensaje de confirmación al usuario
-				BotHelper.sendMessageToTelegram(chatId, "La tarea ha sido aceptada correctamente.", this);
+				BotHelper.sendMessageToTelegram(chatId, "The task has been accepted succesfully", this);
 	
 				// Redirigir al menú anterior
 				String previousMenu = chatPreviousMenuMap.get(chatId);
@@ -625,11 +632,10 @@ public class BotController extends TelegramLongPollingBot {
 					}
 				}
 
-	
 				clearChatState(chatId);
 	
 			} else {
-				BotHelper.sendMessageToTelegram(chatId, "No se encontró la tarea con ID: " + tareaId, this);
+				BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + tareaId, this);
 			}
 		} else if (callbackData.startsWith("EDIT_PROJECT")) {
 			String[] parts = callbackData.replace("EDIT_PROJECT ", "").split("/");
@@ -641,7 +647,7 @@ public class BotController extends TelegramLongPollingBot {
 				// Mostrar el menú de modificación del proyecto
 				editProjectMenu(chatId, proyecto);
 			} else {
-				BotHelper.sendMessageToTelegram(chatId, "No se encontró el proyecto con ID: " + proyectoId, this);
+				BotHelper.sendMessageToTelegram(chatId, "No project found with ID: " + proyectoId, this);
 			}
 		} else if (callbackData.startsWith("BACK_TO_NOT_ACCEPTED_TASKS")) {
 			String[] parts = callbackData.replace("BACK_TO_NOT_ACCEPTED_TASKS ", "").split("/");
@@ -661,7 +667,7 @@ public class BotController extends TelegramLongPollingBot {
 				// Mostrar el menú de modificación del proyecto
 				showNotAcceptedTasks(chatId, proyecto.getID());
 			} else {
-				BotHelper.sendMessageToTelegram(chatId, "No se encontró el proyecto con ID: " + proyectoId, this);
+				BotHelper.sendMessageToTelegram(chatId, "No project found with ID: " + proyectoId, this);
 			}
 		} else if (callbackData.startsWith("SELECT_SPRINT_NOT_ACCEPTED")) {
 			// Manejar la selección de sprint
@@ -683,12 +689,12 @@ public class BotController extends TelegramLongPollingBot {
 				// Regresar al menú de modificación de tareas
 				showTaskModificationMenu(chatId, tarea);
 			} else {
-				BotHelper.sendMessageToTelegram(chatId, "No se encontró la tarea con ID: " + idTarea, this);
+				BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + idTarea, this);
 			}
 		} else if (callbackData.startsWith("SPRINT_FOR_UPDATE_TASK")) {
 			String[] parts = callbackData.split(" ");
 			int sprintId = Integer.parseInt(parts[1]);
-			listTasksForUserUpdateBySprint(chatId, sprintId);
+			listTasksForUserUpdateStatusBySprint(chatId, sprintId);
 
 		} else if (callbackData.equals("VIEW_ALL_TASKS_FOR_UPDATE")) {
 			
@@ -699,10 +705,54 @@ public class BotController extends TelegramLongPollingBot {
 			saveChatState(chatId, "WAITING_FOR_TASK_STATUS_UPDATE", idTarea);
 			// Enviar un mensaje solicitando el nuevo valor para el campo
 			BotHelper.sendMessageToTelegram(chatId, "Write the number for the newstate.\n1. Pending\n2. Doing\n3. Done", this);
-		}	
+		} else if (callbackData.equals("BACK_TO_DEVELOPER_MAIN_MENU")) {
+			// Regresar al menú principal
+			clearChatState(chatId);
+			showDeveloperMainMenu(chatId);
+		}
 	}
 
-	private void listTasksForUserUpdateBySprint(long chatId, int idSprint){
+	private void listAllTasksForUserUpdateStatus(long chatId){
+		try {
+			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+			List<InlineKeyboardButton> titleRow = new ArrayList<>();
+			InlineKeyboardButton TitleButton = new InlineKeyboardButton();
+			TitleButton.setText("All tasks");
+			TitleButton.setCallbackData("NO_ACTION");
+			titleRow.add(TitleButton);
+			rowsInline.add(titleRow);
+
+			ResponseEntity<Usuario> usuario = usuarioService.getItemByTelegramId(userTelegramId);
+			Usuario userInChat = usuario.getBody();
+			if(userInChat!= null){
+				List<Tarea> tareasDelSprint = tareaService.findAllTasksFromProjectForUser(userInChat.getID());
+				for(Tarea tarea : tareasDelSprint){
+				List<InlineKeyboardButton> rowInline = new ArrayList<>();
+				InlineKeyboardButton taskButton = new InlineKeyboardButton();
+				InlineKeyboardButton statusButton = new InlineKeyboardButton();
+				taskButton.setText(tarea.getNombre());
+				taskButton.setCallbackData("UPDATE_STATUS " + tarea.getIdTarea());
+				statusButton.setText(idColumnaStringReturn(tarea.getIdColumna()));
+				statusButton.setCallbackData("UPDATE_STATUS " + tarea.getIdTarea());
+				rowInline.add(taskButton);
+				rowInline.add(statusButton);
+				rowsInline.add(rowInline);
+				}
+			}
+
+			inlineKeyboardMarkup.setKeyboard(rowsInline);
+			SendMessage messageToTelegram = new SendMessage();
+			messageToTelegram.setChatId(chatId);
+			messageToTelegram.setText("Select the task to update status");
+			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+			execute(messageToTelegram);			
+		} catch (TelegramApiException e) {
+			logger.error(e.getLocalizedMessage(), e);
+		}
+	}
+
+	private void listTasksForUserUpdateStatusBySprint(long chatId, int idSprint){
 		try {
 			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
 			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
@@ -710,7 +760,7 @@ public class BotController extends TelegramLongPollingBot {
 			InlineKeyboardButton sprintTitleButton = new InlineKeyboardButton();
 			ResponseEntity<Sprints> sprintResponse = sprintsService.getItemById(idSprint);
 			Sprints sprint = sprintResponse.getBody();
-			sprintTitleButton.setText("Tareas de " + sprint.getNombre());
+			sprintTitleButton.setText(sprint.getNombre() + " tasks");
 			sprintTitleButton.setCallbackData("NO_ACTION");
 			titleRow.add(sprintTitleButton);
 			rowsInline.add(titleRow);
@@ -736,7 +786,7 @@ public class BotController extends TelegramLongPollingBot {
 			inlineKeyboardMarkup.setKeyboard(rowsInline);
 			SendMessage messageToTelegram = new SendMessage();
 			messageToTelegram.setChatId(chatId);
-			messageToTelegram.setText("Selecciona la tarea para modificar su estatus");
+			messageToTelegram.setText("Select the task to update status");
 			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
 			execute(messageToTelegram);			
 		} catch (TelegramApiException e) {
@@ -747,7 +797,7 @@ public class BotController extends TelegramLongPollingBot {
 	private void showManagerMainMenu(long chatId) {
 		SendMessage messageToTelegram = new SendMessage();
 		messageToTelegram.setChatId(chatId);
-		messageToTelegram.setText(BotMessages.HELLO_MYTODO_BOT.getMessage());
+		messageToTelegram.setText(BotMessages.HELLO_MANAGER.getMessage());
 
 		ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
 		List<KeyboardRow> keyboard = new ArrayList<>();
@@ -777,7 +827,7 @@ public class BotController extends TelegramLongPollingBot {
 	private void showDeveloperMainMenu(long chatId) {
 		SendMessage messageToTelegram = new SendMessage();
 		messageToTelegram.setChatId(chatId);
-		messageToTelegram.setText(BotMessages.HELLO_MYTODO_BOT.getMessage());
+		messageToTelegram.setText(BotMessages.HELLO_DEVELOPER.getMessage());
 
 		ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
 		List<KeyboardRow> keyboard = new ArrayList<>();
@@ -814,7 +864,7 @@ public class BotController extends TelegramLongPollingBot {
 			// Agregar el primer renglón con el título
 			List<InlineKeyboardButton> titleRow = new ArrayList<>();
 			InlineKeyboardButton titleButton = new InlineKeyboardButton();
-			titleButton.setText("Lista de Tareas No Aceptadas");
+			titleButton.setText("Not Accepted Tasks");
 			titleButton.setCallbackData("NO_ACTION");
 			titleRow.add(titleButton);
 			rowsInline.add(titleRow);
@@ -832,7 +882,7 @@ public class BotController extends TelegramLongPollingBot {
 				if (usuario != null) {
 					usuarioButton.setText(usuario.getNombre());
 				} else {
-					usuarioButton.setText("Sin encargado");
+					usuarioButton.setText("No user in charge");
 				}
 				usuarioButton.setCallbackData("ACCEPT_TASK " + tarea.getNombre() + "/" + tarea.getIdTarea());
 				rowInline.add(usuarioButton);
@@ -843,7 +893,7 @@ public class BotController extends TelegramLongPollingBot {
 					proyectoButton.setText(proyecto.getNombre());
 				} catch (Exception e) {
 					proyectoButton.setText(String.valueOf(tarea.getIdProyecto()));
-					logger.error("Error obteniendo el proyecto desde el Id de la tarea", e);
+					logger.error("Error obtaining project from task", e);
 				}
 				proyectoButton.setCallbackData("ACCEPT_TASK " + tarea.getNombre() + "/" + tarea.getIdTarea());
 				rowInline.add(proyectoButton);
@@ -852,7 +902,7 @@ public class BotController extends TelegramLongPollingBot {
 			}
 
 			InlineKeyboardButton mainManagerMenuButton = new InlineKeyboardButton();
-			mainManagerMenuButton.setText("Regresar al menu de manager");
+			mainManagerMenuButton.setText("Back to manager main menu");
 			mainManagerMenuButton.setCallbackData("BACK_TO_MANAGER_MAIN_MENU");
 			List<InlineKeyboardButton> backRow = new ArrayList<>();
 			backRow.add(mainManagerMenuButton);
@@ -862,17 +912,17 @@ public class BotController extends TelegramLongPollingBot {
 
 			SendMessage messageToTelegram = new SendMessage();
 			messageToTelegram.setChatId(chatId);
-			messageToTelegram.setText("Aquí tienes la lista de tareas no aceptadas:");
+			messageToTelegram.setText("Listing all not accepted tasks:");
 			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
 			execute(messageToTelegram);
 
 			// Mensaje con instrucciones para aceptar una tarea
-			BotHelper.sendMessageToTelegram(chatId, "Si quieres cambiar el estatus de una tarea, selecciona el nombre de la tarea que quieras aceptar.", this);
+			BotHelper.sendMessageToTelegram(chatId, "Click on the name of the task you want to accept", this);
 
 		} catch (TelegramApiException e) {
 			logger.error(e.getLocalizedMessage(), e);
 		} catch (Exception e) {
-			logger.error("Error obteniendo tareas no aceptadas", e);
+			logger.error("Error obtaining not accepted tasks", e);
 		}
 	}
 
@@ -891,7 +941,7 @@ public class BotController extends TelegramLongPollingBot {
 				// Agregar el primer renglón con el título
 				List<InlineKeyboardButton> titleRow = new ArrayList<>();
 				InlineKeyboardButton titleButton = new InlineKeyboardButton();
-				titleButton.setText("Lista de Proyectos");
+				titleButton.setText("Projects list");
 				titleButton.setCallbackData("NO_ACTION");
 				titleRow.add(titleButton);
 				rowsInline.add(titleRow);
@@ -906,7 +956,7 @@ public class BotController extends TelegramLongPollingBot {
 				}
 	
 				InlineKeyboardButton mainManagerMenuButton = new InlineKeyboardButton();
-				mainManagerMenuButton.setText("Regresar al menu de manager");
+				mainManagerMenuButton.setText("Back to manager main menu");
 				mainManagerMenuButton.setCallbackData("BACK_TO_MANAGER_MAIN_MENU");
 				List<InlineKeyboardButton> backRow = new ArrayList<>();
 				backRow.add(mainManagerMenuButton);
@@ -916,14 +966,14 @@ public class BotController extends TelegramLongPollingBot {
 	
 				SendMessage messageToTelegram = new SendMessage();
 				messageToTelegram.setChatId(chatId);
-				messageToTelegram.setText("Selecciona el proyecto para ver tareas sin aceptar:");
+				messageToTelegram.setText("Select project to see the respective not accepted tasks:");
 				messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
 				execute(messageToTelegram);
 			}
 		} catch (TelegramApiException e) {
 			logger.error(e.getLocalizedMessage(), e);
 		} catch (Exception e) {
-			logger.error("Error obteniendo tareas no aceptadas", e);
+			logger.error("Error obtaining not accepted tasks", e);
 		}
 	}
 
@@ -984,13 +1034,13 @@ public class BotController extends TelegramLongPollingBot {
 			// Crear el mensaje con el teclado en línea
 			SendMessage messageToTelegram = new SendMessage();
 			messageToTelegram.setChatId(chatId); // Asignar el chatId
-			messageToTelegram.setText("Elige el proyecto que desees modificar:"); // Texto del mensaje
+			messageToTelegram.setText("Select the project you want to modify"); // Texto del mensaje
 			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup); // Asignar el teclado en línea
 	
 			// Enviar el mensaje
 			execute(messageToTelegram);
 		} catch (TelegramApiException e) {
-			logger.error("Error mostrando el menú de proyectos", e);
+			logger.error("Error obtaining the list of projects", e);
 		}
 	}
 

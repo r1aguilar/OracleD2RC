@@ -32,8 +32,8 @@ public class TareaService {
         return tareasNoAceptadas;
     }
 
-    public List<Tarea> findAllTasksFromProjectForUser(int id_proyecto, int idEncargado){
-        List<Tarea> tareasNoAceptadas = tareaRepository.findByAceptadaAndIdProyectoAndIdEncargado(1, id_proyecto, idEncargado);
+    public List<Tarea> findAllTasksFromProjectForUser(int idEncargado){
+        List<Tarea> tareasNoAceptadas = tareaRepository.findByAceptadaAndIdEncargado(1, idEncargado);
         return tareasNoAceptadas;
     }
 

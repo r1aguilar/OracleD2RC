@@ -18,6 +18,6 @@ public interface TareaRepository extends JpaRepository<Tarea,Integer> {
     List<Tarea> findByAceptada(int aceptada);
     List<Tarea> findByAceptadaAndIdProyecto(int aceptada, int idProyecto);
     List<Tarea> findByAceptadaAndIdSprintAndIdEncargado(int aceptada, int idSprint, int idEncargado);
-    List<Tarea> findByAceptadaAndIdProyectoAndIdEncargado(int aceptada, int idProyecto, int idEncargado);
+    List<Tarea> findByAceptadaAndIdEncargado(int aceptada, int idEncargado);
 }
 
