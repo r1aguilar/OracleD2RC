@@ -5,7 +5,7 @@ public enum BotMessages {
 	HELLO_MANAGER(
 	"Hello Manager! I'm Tasko!\nPlease select on of the option below to continue."),
 	HELLO_DEVELOPER(
-	"Hello Developer! I'm Tasko!\nType a new todo item below and press the send button (blue arrow), or select an option below:"),
+	"Hello Developer! I'm Tasko!\nPlease select on of the option below to continue."),
 	BOT_REGISTERED_STARTED("Bot registered and started succesfully!"),
 	MANAGE_PROJECTS("You have selected the option to manage all your projects, please select an option below: "),
 	ITEM_DONE("Item done! Select /todolist to return to the list of todo items, or /start to go to the main screen."), 
