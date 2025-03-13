@@ -21,7 +21,7 @@ public enum BotLabels {
 	EDIT_PROJECT("Edit Project"),
 	VIEW_TASKS("View Tasks"),
 	UPDATE_TASK_STATUS("Update Task Status"),
-	CREATE_TASK("Create Task"),
+	CREATE_TASK_DEVELOPER("Propose Task"),
 	VIEW_REMINDERS("View Reminders"),
 	DEVELOPER("Developer"),
 	MANAGER("Manager"),

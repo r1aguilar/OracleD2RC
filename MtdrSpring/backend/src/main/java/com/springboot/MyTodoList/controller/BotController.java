@@ -1,6 +1,9 @@
 package com.springboot.MyTodoList.controller;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -241,6 +244,75 @@ public class BotController extends TelegramLongPollingBot {
 						BotHelper.sendMessageToTelegram(chatId, "Text invalid, please try again", this);
 					break;
 				}
+			} else if (chatState.startsWith("WAITING_FOR_CREATING_TASK_DEVELOPER")) {
+				int sprintId = chatTareaIdMap.get(chatId); // Obtener el ID del sprint
+				String[] parts = messageTextFromTelegram.split("\n"); // Dividir el mensaje por líneas
+
+				// Verificar que el mensaje tenga exactamente 4 líneas
+				if (parts.length == 4) {
+					String name = parts[0].trim(); // Nombre de la tarea
+					String description = parts[1].trim(); // Descripción de la tarea
+					String priorityStr = parts[2].trim(); // Prioridad de la tarea
+					String dueDateStr = parts[3].trim(); // Fecha de vencimiento de la tarea
+
+					// Validar el campo de prioridad
+					int priority;
+					try {
+						priority = Integer.parseInt(priorityStr);
+						if (priority < 1 || priority > 3) {
+							throw new NumberFormatException(); // Prioridad fuera de rango
+						}
+					} catch (NumberFormatException e) {
+						BotHelper.sendMessageToTelegram(chatId, "Task could not be created correctly. Priority must be a number between 1 and 3.", this);
+						return;
+					}
+
+					// Validar el campo de fecha de vencimiento
+					OffsetDateTime dueDate;
+					try {
+						// Añadir la hora al final de la fecha para convertirla a OffsetDateTime
+						dueDate = OffsetDateTime.parse(dueDateStr + "T23:59:59Z");
+					} catch (DateTimeParseException e) {
+						BotHelper.sendMessageToTelegram(chatId, "Task could not be created correctly. Due date must be in the format YYYY-MM-DD.", this);
+						return;
+					}
+
+					// Crear la nueva tarea
+					Tarea nuevaTarea = new Tarea();
+					nuevaTarea.setNombre(name); // Establecer el nombre
+					nuevaTarea.setDescripcion(description); // Establecer la descripción
+					nuevaTarea.setPrioridad(priority); // Establecer la prioridad
+					nuevaTarea.setFechaVencimiento(dueDate); // Establecer la fecha de vencimiento
+					int idProyecto;
+					if(sprintId != 0){
+						nuevaTarea.setIdSprint(sprintId); // Establecer el ID del sprint
+						idProyecto = sprintsService.getItemById(sprintId).getBody().getIdProyecto();
+					} else{
+						// Como no hay sprint se debe de buscar el proyecto al que pertenece el usuario
+						idProyecto = equipoService.getItemById(integrantesEquipoService.getItemByIdUsuario(usuarioService.getItemByTelegramId(userTelegramId).getBody().getID()).getBody().getIdEquipo()).getBody().getIdProyecto();
+					}
+					nuevaTarea.setIdProyecto(idProyecto);
+					LocalDate currentDate = LocalDate.now();
+        			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        			String formattedDate = currentDate.format(formatter);
+					nuevaTarea.setfechaInicio(OffsetDateTime.parse(formattedDate+"T23:59:59Z"));
+					nuevaTarea.setAceptada(0);
+					nuevaTarea.setIdColumna(1);
+					nuevaTarea.setIdEncargado(usuarioService.getItemByTelegramId(userTelegramId).getBody().getID());
+
+					// Guardar la tarea en la base de datos
+					Tarea response = tareaService.addTarea(nuevaTarea);
+					if (response != null) {
+						BotHelper.sendMessageToTelegram(chatId, "Task created successfully!", this);
+						clearChatState(chatId);
+						createTaskDeveloper(chatId);
+					} else {
+						BotHelper.sendMessageToTelegram(chatId, "Task could not be created correctly. Please try again.", this);
+					}
+				} else {
+					// El mensaje no tiene el formato correcto
+					BotHelper.sendMessageToTelegram(chatId, "Task could not be created correctly. Please use the correct format:\n\nName\nDescription\nPriority (From 1 to 3)\nDue Date (YYYY-MM-DD)", this);
+				}
 			}
 		} else if (messageTextFromTelegram.equals(BotCommands.LOGIN_COMMAND.getCommand()) || messageTextFromTelegram.equals(BotCommands.START.getCommand())) {
 			loginChatbot(chatId, update);
@@ -260,7 +332,63 @@ public class BotController extends TelegramLongPollingBot {
 			showDeveloperMainMenu(chatId);
 		} else if (messageTextFromTelegram.equals(BotLabels.UPDATE_TASK_STATUS.getLabel())) {
 			showUpdateTaskStatusDeveloperMenu(chatId);
+		} else if (messageTextFromTelegram.equals(BotLabels.CREATE_TASK_DEVELOPER.getLabel())) {
+			createTaskDeveloper(chatId);
 		} 
+	}
+
+	private void createTaskDeveloper(long chatId){
+		try {
+			// Aqui se selecciona el sprint donde se quiere meter la tarea
+			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+			ResponseEntity<Usuario> usuario = usuarioService.getItemByTelegramId(userTelegramId);
+			Usuario userInChat = usuario.getBody();
+			if(userInChat!= null){
+				ResponseEntity<IntegrantesEquipo> integranteResponse = integrantesEquipoService.getItemByIdUsuario(userInChat.getID());
+				IntegrantesEquipo integrante = integranteResponse.getBody();
+				if(integrante != null){
+					ResponseEntity<Equipo> equipoResponse = equipoService.getItemById(integrante.getIdEquipo());
+					Equipo equipo = equipoResponse.getBody();
+					if(equipo != null){
+						// Obtener la lista de sprints del proyecto
+						List<Sprints> sprints = sprintsService.findAllSprintsFromProject(equipo.getIdProyecto());
+						// Despues de obtener la lista de sprints se hace el menu donde el callback sera el id de cada sprint
+						for (Sprints sprint : sprints) {
+							List<InlineKeyboardButton> rowInline = new ArrayList<>();
+							InlineKeyboardButton sprintButton = new InlineKeyboardButton();
+							sprintButton.setText(sprint.getNombre());
+							sprintButton.setCallbackData("SPRINT_FOR_CREATING_TASK_DEVELOPER " + sprint.getID());
+							rowInline.add(sprintButton);
+							rowsInline.add(rowInline);
+						}
+
+						List<InlineKeyboardButton> allTasksRow = new ArrayList<>();
+						InlineKeyboardButton allTasksButton = new InlineKeyboardButton();
+						allTasksButton.setText("Backlog");
+						allTasksButton.setCallbackData("SPRINT_FOR_CREATING_TASK_DEVELOPER NULL");
+						allTasksRow.add(allTasksButton);
+						rowsInline.add(allTasksRow);
+
+						List<InlineKeyboardButton> lastRow = new ArrayList<>();
+						InlineKeyboardButton lastButton = new InlineKeyboardButton();
+						lastButton.setText("Back to developer main menu");
+						lastButton.setCallbackData("BACK_TO_DEVELOPER_MAIN_MENU");
+						lastRow.add(lastButton);
+						rowsInline.add(lastRow);
+					}
+				}
+			}
+			inlineKeyboardMarkup.setKeyboard(rowsInline);
+			SendMessage messageToTelegram = new SendMessage();
+			messageToTelegram.setChatId(chatId);
+			messageToTelegram.setText("Select an sprint to filter tasks or show all assigned tasks");
+			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+			execute(messageToTelegram);
+
+		} catch (TelegramApiException e) {
+			logger.error(e.getLocalizedMessage(), e);
+		}
 	}
 
 	private void loginChatbot(long chatId, Update update){
@@ -286,7 +414,7 @@ public class BotController extends TelegramLongPollingBot {
 			List<KeyboardRow> keyboard = new ArrayList<>();
 
 			KeyboardRow row = new KeyboardRow();
-			KeyboardButton shareContactButton = new KeyboardButton("Share your phone number");
+			KeyboardButton shareContactButton = new KeyboardButton("📞 Share your phone number");
 			shareContactButton.setRequestContact(true);
 			row.add(shareContactButton);
 			keyboard.add(row);
@@ -697,7 +825,7 @@ public class BotController extends TelegramLongPollingBot {
 			listTasksForUserUpdateStatusBySprint(chatId, sprintId);
 
 		} else if (callbackData.equals("VIEW_ALL_TASKS_FOR_UPDATE")) {
-			
+			listAllTasksForUserUpdateStatus(chatId);
 		} else if (callbackData.startsWith("UPDATE_STATUS")) {
 			String[] parts = callbackData.split(" ");
 			int idTarea = Integer.parseInt(parts[1]);
@@ -709,6 +837,15 @@ public class BotController extends TelegramLongPollingBot {
 			// Regresar al menú principal
 			clearChatState(chatId);
 			showDeveloperMainMenu(chatId);
+		}	else if (callbackData.startsWith("SPRINT_FOR_CREATING_TASK_DEVELOPER")) {
+			BotHelper.sendMessageToTelegram(chatId, "Please write the information of the task you are about to create in the following format, respecting line breaks\n\nName\nDescription\nPriority (From 1 to 3)\nDue Date (YYYY-MM-DD)", this);
+			String[] parts = callbackData.split(" ");
+			int idToSend = 0;
+			String isNull = String.valueOf(parts[1]);
+			if(!"NULL".equals(isNull)){
+				idToSend = Integer.parseInt(isNull);
+			}
+			saveChatState(chatId, "WAITING_FOR_CREATING_TASK_DEVELOPER", idToSend);
 		}
 	}
 
@@ -841,7 +978,7 @@ public class BotController extends TelegramLongPollingBot {
 		// Second row
 		row = new KeyboardRow();
 		row.add(BotLabels.UPDATE_TASK_STATUS.getLabel());
-		row.add(BotLabels.CREATE_TASK.getLabel());
+		row.add(BotLabels.CREATE_TASK_DEVELOPER.getLabel());
 		keyboard.add(row);
 
 		keyboardMarkup.setKeyboard(keyboard);
@@ -1044,6 +1181,10 @@ public class BotController extends TelegramLongPollingBot {
 		}
 	}
 
+	private void saveOnlyChatStateMap(long chatId, String state){
+		chatStateMap.put(chatId, state);
+	}
+
 	private void saveChatState(long chatId, String state, int tareaId) {
 		chatStateMap.put(chatId, state);
 		chatTareaIdMap.put(chatId, tareaId);
@@ -1059,13 +1200,13 @@ public class BotController extends TelegramLongPollingBot {
 		String nombre = " ";
 		switch(idColumna){
 			case 1:
-				nombre = "Pending";
+				nombre = "❌ Pending";
 				break;
 			case 2:
-				nombre = "Doing";
+				nombre = "🟠 Doing";
 				break;
 			case 3:
-				nombre = "Done";
+				nombre = "✅ Done";
 				break;	
 		}
 		return nombre;

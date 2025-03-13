@@ -24,10 +24,10 @@ public class Tarea {
     int idProyecto;
 
     @Column(name = "ID_COLUMNA")
-    int idColumna;
+    Integer idColumna;
 
     @Column(name = "ID_SPRINT")
-    int idSprint;
+    Integer idSprint;
 
     @Column(name = "ACEPTADA")
     int aceptada;
@@ -48,13 +48,13 @@ public class Tarea {
     OffsetDateTime fechaCompletado;
 
     @Column(name = "STORYPOINTS")
-    int storyPoints;
+    Integer storyPoints;
 
     @Column(name = "TIEMPOREAL")
     String tiempoReal;
 
     @Column(name = "PRIORIDAD")
-    int prioridad;
+    Integer prioridad;
 
     @Column(name = "DELETED")
     int deleted;
