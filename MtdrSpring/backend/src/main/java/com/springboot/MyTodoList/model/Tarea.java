@@ -51,7 +51,10 @@ public class Tarea {
     Integer storyPoints;
 
     @Column(name = "TIEMPOREAL")
-    String tiempoReal;
+    Integer tiempoReal;
+
+    @Column(name = "TIEMPOESTIMADO")
+    Integer tiempoEstimado;
 
     @Column(name = "PRIORIDAD")
     Integer prioridad;
@@ -89,15 +92,15 @@ public class Tarea {
         return idColumna;
     }
 
-    public void setIdColumna(int idColumna) {
+    public void setIdColumna(Integer idColumna) {
         this.idColumna = idColumna;
     }
 
-    public int getIdSprint() {
+    public Integer getIdSprint() {
         return idSprint;
     }
 
-    public void setIdSprint(int idSprint) {
+    public void setIdSprint(Integer idSprint) {
         this.idSprint = idSprint;
     }
 
@@ -141,20 +144,28 @@ public class Tarea {
         this.fechaCompletado = fechaCompletado;
     }
 
-    public int getStoryPoints() {
+    public Integer getStoryPoints() {
         return storyPoints;
     }
 
-    public void setStoryPoints(int storyPoints) {
+    public void setStoryPoints(Integer storyPoints) {
         this.storyPoints = storyPoints;
     }
 
-    public String getTiempoReal() {
+    public Integer getTiempoReal() {
         return tiempoReal;
     }
 
-    public void setTiempoReal(String tiempoReal) {
+    public void setTiempoReal(Integer tiempoReal) {
         this.tiempoReal = tiempoReal;
+    }
+
+    public Integer getTiempoEstimado() {
+        return tiempoEstimado;
+    }
+
+    public void setTiempoEstimado(Integer tiempoEstimado) {
+        this.tiempoEstimado = tiempoEstimado;
     }
 
     public int getPrioridad() {

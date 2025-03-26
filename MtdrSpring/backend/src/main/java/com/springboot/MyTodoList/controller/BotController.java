@@ -153,7 +153,7 @@ public class BotController extends TelegramLongPollingBot {
 								tarea.setStoryPoints(Integer.parseInt(messageTextFromTelegram));
 								break;
 							case "Estimated Time":
-								tarea.setTiempoReal(messageTextFromTelegram);
+								tarea.setTiempoEstimado(Integer.parseInt(messageTextFromTelegram));
 								break;
 							default:
 								// Manejar campos no reconocidos
@@ -334,7 +334,9 @@ public class BotController extends TelegramLongPollingBot {
 			showUpdateTaskStatusDeveloperMenu(chatId);
 		} else if (messageTextFromTelegram.equals(BotLabels.CREATE_TASK_DEVELOPER.getLabel())) {
 			createTaskDeveloper(chatId);
-		} 
+		} else {
+			BotHelper.sendMessageToTelegram(chatId, "Message not recognized, please try again", this);
+		}
 	}
 
 	private void createTaskDeveloper(long chatId){
@@ -495,8 +497,8 @@ public class BotController extends TelegramLongPollingBot {
 		try {
 			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
 			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
-			String sprintName = "Not assigned";
-			if(tarea.getIdSprint() != 0){
+			String sprintName = "Backlog";
+			if(tarea.getIdSprint() != null){
 				ResponseEntity<Sprints> sprint = sprintsService.getItemById(tarea.getIdSprint());
 				if(sprint.getBody() != null){
 					sprintName = sprint.getBody().getNombre();
@@ -509,9 +511,9 @@ public class BotController extends TelegramLongPollingBot {
 				{"Priority", tarea.getPrioridad() != 0 ? String.valueOf(tarea.getPrioridad()) : "No Priority"},
 				{"Sprint", sprintName},
 				{"Due date", tarea.getFechaVencimiento() != null ? String.valueOf(tarea.getFechaVencimiento()).substring(0, 10) : "No Due Date"},
-				{"Story Points", tarea.getStoryPoints() != 0 ? String.valueOf(tarea.getStoryPoints()) : "No Story Points"},
-				{"Estimated Time", tarea.getTiempoReal() != null ? tarea.getTiempoReal() : "No Estimated Time"}
-			};
+				{"Story Points", tarea.getStoryPoints() != null ? String.valueOf(tarea.getStoryPoints()) : "No Story Points"},
+				{"Estimated Time", tarea.getTiempoEstimado() != null ? String.valueOf(tarea.getTiempoEstimado()) : "No Estimated Time"}
+			};	
 	
 			for (String[] field : fields) {
 				List<InlineKeyboardButton> rowInline = new ArrayList<>();
@@ -589,6 +591,14 @@ public class BotController extends TelegramLongPollingBot {
 					rowInline.add(sprintButton);
 					rowsInline.add(rowInline);
 				}
+
+				// Botón de regresar
+				List<InlineKeyboardButton> backlogRow = new ArrayList<>();
+				InlineKeyboardButton backlogButton = new InlineKeyboardButton();
+				backlogButton.setText("Backlog");
+				backlogButton.setCallbackData("SET_SPRINT " + idTarea + " " + 0);
+				backlogRow.add(backlogButton);
+				rowsInline.add(backlogRow);
 	
 				// Botón de regresar
 				List<InlineKeyboardButton> backRow = new ArrayList<>();
@@ -738,30 +748,54 @@ public class BotController extends TelegramLongPollingBot {
 			BotHelper.sendMessageToTelegram(chatId, "Please write the new value for " + field, this);
 		} else if (callbackData.startsWith("CONFIRM_ACCEPT_TASK")) {
 			int tareaId = Integer.parseInt(callbackData.replace("CONFIRM_ACCEPT_TASK ", ""));
-	
+			String errorMessage = "No se pudo aceptar la tarea, debe llenar todos los campos";
 			// Obtener la tarea actual
 			Tarea tarea = tareaService.getItemById(tareaId).getBody();
 			if (tarea != null) {
-				int idProyecto = tarea.getIdProyecto();
-				// Actualizar el estado de la tarea a "Aceptada"
-				tarea.setAceptada(1);
-				tareaService.updateTarea(tareaId, tarea);
-	
-				// Enviar un mensaje de confirmación al usuario
-				BotHelper.sendMessageToTelegram(chatId, "The task has been accepted succesfully", this);
-	
-				// Redirigir al menú anterior
-				String previousMenu = chatPreviousMenuMap.get(chatId);
-				if (previousMenu != null) {
-					if (previousMenu.equals("SHOW_NOT_ACCEPTED_TASKS")) {
-						showNotAcceptedTasks(chatId, idProyecto);
-					} else if (previousMenu.equals("MAIN_MENU")) {
-						showManagerMainMenu(chatId);
+				// Verificar que ningún campo esencial sea nulo o inválido
+				if (tarea.getNombre() == null || tarea.getNombre().isEmpty()) {
+					BotHelper.sendMessageToTelegram(chatId, errorMessage, this);
+				}
+				else if (tarea.getDescripcion() == null || tarea.getDescripcion().isEmpty()) {
+					BotHelper.sendMessageToTelegram(chatId, errorMessage, this);
+				}
+				else if (tarea.getPrioridad() == 0) {
+					BotHelper.sendMessageToTelegram(chatId, errorMessage, this);
+				}
+				else if (tarea.getFechaVencimiento() == null) {
+					BotHelper.sendMessageToTelegram(chatId, errorMessage, this);
+				}
+				else if (tarea.getStoryPoints() == 0) {
+					BotHelper.sendMessageToTelegram(chatId, errorMessage, this);
+				}
+				else if (tarea.getTiempoEstimado() == 0) {
+					BotHelper.sendMessageToTelegram(chatId, errorMessage, this);
+				}
+				else{
+					int idProyecto = tarea.getIdProyecto();
+					// Actualizar el estado de la tarea a "Aceptada"
+					tarea.setAceptada(1);
+					tareaService.updateTarea(tareaId, tarea);
+
+					// Enviar un mensaje de confirmación al usuario
+					BotHelper.sendMessageToTelegram(chatId, "The task has been accepted successfully", this);
+
+					// Redirigir al menú anterior
+					String previousMenu = chatPreviousMenuMap.get(chatId);
+					if (previousMenu != null) {
+						if (previousMenu.equals("SHOW_NOT_ACCEPTED_TASKS")) {
+							showNotAcceptedTasks(chatId, idProyecto);
+						} else if (previousMenu.equals("MAIN_MENU")) {
+							showManagerMainMenu(chatId);
+						}
 					}
+
+					clearChatState(chatId);
+					return;
 				}
 
-				clearChatState(chatId);
-	
+				// Mostrar nuevamente el menú de modificación de la tarea
+				showTaskModificationMenu(chatId, tarea);
 			} else {
 				BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + tareaId, this);
 			}
@@ -811,7 +845,11 @@ public class BotController extends TelegramLongPollingBot {
 			ResponseEntity<Tarea> tareaResponse = tareaService.getItemById(idTarea);
 			if (tareaResponse.getBody() != null) {
 				Tarea tarea = tareaResponse.getBody();
-				tarea.setIdSprint(idSprint); // Actualizar el sprint
+				if(idSprint != 0){
+					tarea.setIdSprint(idSprint); // Actualizar el sprint
+				} else {
+					tarea.setIdSprint(null);
+				}
 				tareaService.updateTarea(idTarea, tarea); // Guardar los cambios
 	
 				// Regresar al menú de modificación de tareas
@@ -837,7 +875,7 @@ public class BotController extends TelegramLongPollingBot {
 			// Regresar al menú principal
 			clearChatState(chatId);
 			showDeveloperMainMenu(chatId);
-		}	else if (callbackData.startsWith("SPRINT_FOR_CREATING_TASK_DEVELOPER")) {
+		} else if (callbackData.startsWith("SPRINT_FOR_CREATING_TASK_DEVELOPER")) {
 			BotHelper.sendMessageToTelegram(chatId, "Please write the information of the task you are about to create in the following format, respecting line breaks\n\nName\nDescription\nPriority (From 1 to 3)\nDue Date (YYYY-MM-DD)", this);
 			String[] parts = callbackData.split(" ");
 			int idToSend = 0;
