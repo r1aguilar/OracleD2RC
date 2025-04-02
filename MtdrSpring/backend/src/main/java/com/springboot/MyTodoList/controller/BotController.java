@@ -2,6 +2,7 @@ package com.springboot.MyTodoList.controller;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -235,6 +236,10 @@ public class BotController extends TelegramLongPollingBot {
 					case "3":
 						id = Integer.parseInt(messageTextFromTelegram);
 						tarea.setIdColumna(id);
+						// Obtener la fecha y hora actual en UTC y formatearla
+						OffsetDateTime fechaActual = OffsetDateTime.now(ZoneOffset.UTC).withNano(0);
+						String fechaFormateada = fechaActual.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssX"));
+						tarea.setFechaCompletado(OffsetDateTime.parse(fechaFormateada));
 						tareaService.updateTarea(tareaId, tarea);
 						BotHelper.sendMessageToTelegram(chatId, "Changed " + tarea.getNombre() + " status to Done", this);
 						clearChatState(chatId);
@@ -427,7 +432,7 @@ public class BotController extends TelegramLongPollingBot {
 			try {
 				execute(message);
 			} catch (TelegramApiException e) {
-				logger.error("Error enviando solicitud de número de teléfono", e);
+				logger.error("Error sending contact request", e);
 			}
 		}
 	}
@@ -592,7 +597,7 @@ public class BotController extends TelegramLongPollingBot {
 					rowsInline.add(rowInline);
 				}
 
-				// Botón de regresar
+				// Botón de backlog
 				List<InlineKeyboardButton> backlogRow = new ArrayList<>();
 				InlineKeyboardButton backlogButton = new InlineKeyboardButton();
 				backlogButton.setText("Backlog");
@@ -884,6 +889,8 @@ public class BotController extends TelegramLongPollingBot {
 				idToSend = Integer.parseInt(isNull);
 			}
 			saveChatState(chatId, "WAITING_FOR_CREATING_TASK_DEVELOPER", idToSend);
+		} else if (callbackData.equals("BACK_TO_SELECT_SPRINT_UPDATE_TASK_DEVELOPER")){
+			showUpdateTaskStatusDeveloperMenu(chatId);
 		}
 	}
 
@@ -915,6 +922,14 @@ public class BotController extends TelegramLongPollingBot {
 				rowsInline.add(rowInline);
 				}
 			}
+
+			// Botón de regresar
+			List<InlineKeyboardButton> backRow = new ArrayList<>();
+			InlineKeyboardButton backButton = new InlineKeyboardButton();
+			backButton.setText("Go back");
+			backButton.setCallbackData("BACK_TO_SELECT_SPRINT_UPDATE_TASK_DEVELOPER");
+			backRow.add(backButton);
+			rowsInline.add(backRow);
 
 			inlineKeyboardMarkup.setKeyboard(rowsInline);
 			SendMessage messageToTelegram = new SendMessage();

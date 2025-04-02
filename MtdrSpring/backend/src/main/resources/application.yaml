@@ -14,3 +14,7 @@ spring:
     user:
       name: ${ui_username}
       password: ${ui_password}
+
+server:
+  address: 0.0.0.0 # Binds the server to all network interfaces
+  port: 8080           # You can adjust this port

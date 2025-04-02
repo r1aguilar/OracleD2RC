@@ -36,6 +36,26 @@ public class UsuarioController {
         }
     }
 
+    @GetMapping(value = "/login/{telefono}/{contrasena}")
+    public ResponseEntity<Usuario> loginUsuario(@PathVariable String telefono, @PathVariable String contrasena) {
+        try {
+            ResponseEntity<Usuario> responseEntity = usuarioService.loginByTelefono(telefono, contrasena);
+            return new ResponseEntity<>(responseEntity.getBody(), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @GetMapping(value = "/login/email/{correo}/{contrasena}")
+    public ResponseEntity<Usuario> loginUsuarioPorCorreo(@PathVariable String correo, @PathVariable String contrasena) {
+        try {
+            ResponseEntity<Usuario> responseEntity = usuarioService.loginByCorreo(correo, contrasena);
+            return new ResponseEntity<>(responseEntity.getBody(), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
     @PostMapping(value = "/usuarios")
     public ResponseEntity addUsuario(@RequestBody Usuario usuario_p) throws Exception{
         Usuario dbUsuario = usuarioService.addUsuario(usuario_p);

@@ -49,6 +49,24 @@ public class UsuarioService {
         }
     }
 
+    public ResponseEntity<Usuario> loginByTelefono(String telefono, String password){
+        Optional<Usuario> userByTelefono = UsuarioRepository.findByTelefonoAndPassword(telefono, password);
+        if (userByTelefono.isPresent()){
+            return new ResponseEntity<>(userByTelefono.get(), HttpStatus.OK);
+        }else{
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    public ResponseEntity<Usuario> loginByCorreo(String correo, String password){
+        Optional<Usuario> userByCorreo = UsuarioRepository.findByCorreoAndPassword(correo, password);
+        if (userByCorreo.isPresent()){
+            return new ResponseEntity<>(userByCorreo.get(), HttpStatus.OK);
+        }else{
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
     public Usuario addUsuario(Usuario Usuario){
         return UsuarioRepository.save(Usuario);
     }

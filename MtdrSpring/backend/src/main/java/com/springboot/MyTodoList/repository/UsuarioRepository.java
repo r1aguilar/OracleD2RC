@@ -17,5 +17,7 @@ import com.springboot.MyTodoList.model.Usuario;
 public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
     Optional<Usuario> findByIdTelegram(Long id_telegram);
     Optional<Usuario> findByTelefono(String telefono);
+    Optional<Usuario> findByTelefonoAndPassword(String telefono, String password);
+    Optional<Usuario> findByCorreoAndPassword(String correo, String password);
 }
 
