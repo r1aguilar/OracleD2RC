@@ -38,13 +38,13 @@ public class Tarea {
     @Column(name = "DESCRIPCION")
     String descripcion;
 
-    @Column(name = "FECHAINICIO_TZ", nullable = false)
+    @Column(name = "FECHAINICIO", nullable = false)
     OffsetDateTime fechaInicio;
 
-    @Column(name = "FECHAVENCIMIENTO_TZ", nullable = false)
+    @Column(name = "FECHAVENCIMIENTO", nullable = false)
     OffsetDateTime fechaVencimiento;
 
-    @Column(name = "FECHACOMPLETADO_TZ")
+    @Column(name = "FECHACOMPLETADO")
     OffsetDateTime fechaCompletado;
 
     @Column(name = "STORYPOINTS")
