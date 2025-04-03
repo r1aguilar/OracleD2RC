@@ -41,6 +41,11 @@ public class TareaController {
         }
     }
 
+    @GetMapping(value = "/TareasUsuario/{id}")
+    public List<Tarea> getAllTareasAceptadasDeveloper(@PathVariable int id){
+        return tareaService.findAllTasksFromProjectForUser(id);
+    }
+
     @PostMapping(value = "/Tareas")
     public ResponseEntity addTarea(@RequestBody Tarea Tarea_p) throws Exception{
         Tarea dbTarea = tareaService.addTarea(Tarea_p);
