@@ -81,6 +81,7 @@ public class TareaService {
             Tarea.setFechaCompletado(td.getFechaCompletado());
             Tarea.setStoryPoints(td.getStoryPoints());
             Tarea.setTiempoReal(td.getTiempoReal());
+            Tarea.setTiempoEstimado(td.getTiempoEstimado());
             Tarea.setPrioridad(td.getPrioridad());
             Tarea.setAceptada(td.getAceptada());
             Tarea.setDeleted(td.getDeleted());

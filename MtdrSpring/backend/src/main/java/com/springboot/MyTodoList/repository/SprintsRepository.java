@@ -15,6 +15,6 @@ import com.springboot.MyTodoList.model.Sprints;
 @Transactional
 @EnableTransactionManagement
 public interface SprintsRepository extends JpaRepository<Sprints,Integer> {
-   List<Sprints> findByIdProyecto(int idProyecto);
+   List<Sprints> findByIdProyectoOrderByFechaInicio(int idProyecto);
 }
 

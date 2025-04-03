@@ -158,27 +158,27 @@ public class BotController extends TelegramLongPollingBot {
 								break;
 							default:
 								// Manejar campos no reconocidos
-								BotHelper.sendMessageToTelegram(chatId, "Campo no reconocido: " + field, this);
+								BotHelper.sendMessageToTelegram(chatId, "Not recognized field: " + field, this);
 								return;
 						}	
 						// Actualizar la tarea en la base de datos
 						tareaService.updateTarea(tareaId, tarea);
 			
 						// Enviar un mensaje de confirmación al usuario
-						BotHelper.sendMessageToTelegram(chatId, "El campo " + field + " ha sido actualizado correctamente.", this);
+						BotHelper.sendMessageToTelegram(chatId, "Field " + field + " has been updated succesfully!", this);
 		
 						// Mostrar nuevamente el menú de modificación de la tarea
 						showTaskModificationMenu(chatId, tarea);
 
 					} catch (Exception e) {
 						// Enviar un mensaje de confirmación al usuario
-						BotHelper.sendMessageToTelegram(chatId, "El campo " + field + " no ha podido actualizarse, intentalo nuevamente.", this);
+						BotHelper.sendMessageToTelegram(chatId, "Field " + field + " could not be updated.", this);
 						logger.error("Error actualizando los datos", e);
 						// Mostrar nuevamente el menú de modificación de la tarea
 						showTaskModificationMenu(chatId, tarea);
 					}
 				} else {
-					BotHelper.sendMessageToTelegram(chatId, "No se encontró la tarea con ID: " + tareaId, this);
+					BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + tareaId, this);
 				}
 			} else if (chatState.startsWith("WAITING_FOR_PROJECT_FIELD_")) {
 				String field = chatState.replace("WAITING_FOR_PROJECT_FIELD_", "");
@@ -234,16 +234,10 @@ public class BotController extends TelegramLongPollingBot {
 						showUpdateTaskStatusDeveloperMenu(chatId);
 					break;
 					case "3":
-						id = Integer.parseInt(messageTextFromTelegram);
-						tarea.setIdColumna(id);
-						// Obtener la fecha y hora actual en UTC y formatearla
-						OffsetDateTime fechaActual = OffsetDateTime.now(ZoneOffset.UTC).withNano(0);
-						String fechaFormateada = fechaActual.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssX"));
-						tarea.setFechaCompletado(OffsetDateTime.parse(fechaFormateada));
-						tareaService.updateTarea(tareaId, tarea);
-						BotHelper.sendMessageToTelegram(chatId, "Changed " + tarea.getNombre() + " status to Done", this);
+						// Guardar el estado del chat
+						BotHelper.sendMessageToTelegram(chatId, "Please input, in a whole number, the amount of real hours it took to complete the task", this);
 						clearChatState(chatId);
-						showUpdateTaskStatusDeveloperMenu(chatId);
+						saveChatState(chatId, "WAITING_FOR_DONE_STATUS_REAL_HOURS", tarea.getIdTarea());
 					break;
 					default:
 						BotHelper.sendMessageToTelegram(chatId, "Text invalid, please try again", this);
@@ -317,6 +311,28 @@ public class BotController extends TelegramLongPollingBot {
 				} else {
 					// El mensaje no tiene el formato correcto
 					BotHelper.sendMessageToTelegram(chatId, "Task could not be created correctly. Please use the correct format:\n\nName\nDescription\nPriority (From 1 to 3)\nDue Date (YYYY-MM-DD)", this);
+				}
+			} else if (chatState.startsWith("WAITING_FOR_DONE_STATUS_REAL_HOURS")) {
+				int tareaId = chatTareaIdMap.get(chatId);
+				Tarea tarea = tareaService.getItemById(tareaId).getBody();
+				int realHours;
+
+				try {
+					realHours = Integer.parseInt(messageTextFromTelegram);
+					tarea.setTiempoReal(realHours);
+					tarea.setIdColumna(3);
+				
+					// Obtener la fecha y hora actual en UTC y formatearla
+					OffsetDateTime fechaActual = OffsetDateTime.now(ZoneOffset.UTC).withNano(0);
+					String fechaFormateada = fechaActual.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssX"));
+					tarea.setFechaCompletado(OffsetDateTime.parse(fechaFormateada));
+					tareaService.updateTarea(tareaId, tarea);
+				
+					BotHelper.sendMessageToTelegram(chatId, "Changed " + tarea.getNombre() + " status to Done", this);
+					clearChatState(chatId);
+					showUpdateTaskStatusDeveloperMenu(chatId);
+				} catch (NumberFormatException e) {
+					BotHelper.sendMessageToTelegram(chatId, "Please input a valid number", this);
 				}
 			}
 		} else if (messageTextFromTelegram.equals(BotCommands.LOGIN_COMMAND.getCommand()) || messageTextFromTelegram.equals(BotCommands.START.getCommand())) {
@@ -406,9 +422,9 @@ public class BotController extends TelegramLongPollingBot {
 		if (usuario != null) {
 			// Usuario ya registrado
 			if (usuario.getManager()==true) {
-				showManagerMainMenu(chatId);
+				showManagerMainMenu(chatId, usuario.getNombre());
 			} else {
-				showDeveloperMainMenu(chatId);
+				showDeveloperMainMenu(chatId, usuario.getNombre());
 			}
 		} else {
 			// Pedir información del usuario
@@ -773,7 +789,7 @@ public class BotController extends TelegramLongPollingBot {
 				else if (tarea.getStoryPoints() == 0) {
 					BotHelper.sendMessageToTelegram(chatId, errorMessage, this);
 				}
-				else if (tarea.getTiempoEstimado() == 0) {
+				else if (tarea.getTiempoEstimado() == null) {
 					BotHelper.sendMessageToTelegram(chatId, errorMessage, this);
 				}
 				else{
@@ -973,6 +989,14 @@ public class BotController extends TelegramLongPollingBot {
 				}
 			}
 
+			// Botón de regresar
+			List<InlineKeyboardButton> backRow = new ArrayList<>();
+			InlineKeyboardButton backButton = new InlineKeyboardButton();
+			backButton.setText("Go back");
+			backButton.setCallbackData("BACK_TO_SELECT_SPRINT_UPDATE_TASK_DEVELOPER");
+			backRow.add(backButton);
+			rowsInline.add(backRow);
+
 			inlineKeyboardMarkup.setKeyboard(rowsInline);
 			SendMessage messageToTelegram = new SendMessage();
 			messageToTelegram.setChatId(chatId);
@@ -984,11 +1008,22 @@ public class BotController extends TelegramLongPollingBot {
 		}
 	}
 	
+	private void showManagerMainMenu(long chatId, String userName) {
+		SendMessage messageToTelegram = new SendMessage();
+		messageToTelegram.setChatId(chatId);
+		String[] parts = userName.split(" ");
+		messageToTelegram.setText(BotMessages.HELLO_MANAGER.getMessage() + userName.split(" ")[0] + "!\n" + "I'm Tasko! Please select on of the option below to continue.");
+		managerMenu(chatId, messageToTelegram);
+	}
+
 	private void showManagerMainMenu(long chatId) {
 		SendMessage messageToTelegram = new SendMessage();
 		messageToTelegram.setChatId(chatId);
-		messageToTelegram.setText(BotMessages.HELLO_MANAGER.getMessage());
+		messageToTelegram.setText("Hi Manager, please select on of the option below to continue.");
+		managerMenu(chatId, messageToTelegram);
+	}
 
+	private void managerMenu(long chatId, SendMessage messageToTelegram){
 		ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
 		List<KeyboardRow> keyboard = new ArrayList<>();
 
@@ -1017,8 +1052,18 @@ public class BotController extends TelegramLongPollingBot {
 	private void showDeveloperMainMenu(long chatId) {
 		SendMessage messageToTelegram = new SendMessage();
 		messageToTelegram.setChatId(chatId);
-		messageToTelegram.setText(BotMessages.HELLO_DEVELOPER.getMessage());
+		messageToTelegram.setText("Hi Developer, please select on of the option below to continue.");
+		developerMenu(chatId, messageToTelegram);
+	}
 
+	private void showDeveloperMainMenu(long chatId, String userName) {
+		SendMessage messageToTelegram = new SendMessage();
+		messageToTelegram.setChatId(chatId);
+		messageToTelegram.setText(BotMessages.HELLO_DEVELOPER.getMessage() + userName.split(" ")[0] + "!\n" + "I'm Tasko! Please select on of the option below to continue.");
+		developerMenu(chatId, messageToTelegram);
+	}
+
+	private void developerMenu(long chatId, SendMessage messageToTelegram){
 		ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
 		List<KeyboardRow> keyboard = new ArrayList<>();
 

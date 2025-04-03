@@ -32,7 +32,7 @@ public class SprintsService {
     }
 
     public List<Sprints> findAllSprintsFromProject(int idProyecto){
-        List<Sprints> listaSprints = sprintsRepository.findByIdProyecto(idProyecto);
+        List<Sprints> listaSprints = sprintsRepository.findByIdProyectoOrderByFechaInicio(idProyecto);
         return listaSprints;
     }
 
