@@ -86,5 +86,4 @@ jobs:
           LINTER_SKIP_PATHS: "MtdrSpring/RESETDATABASE.sql,MtdrSpring/DDL.sql,MtdrSpring/backend/Dockerfile"  # Exclude these files
           # Specify Oracle dialect for SQL linting
           VALIDATE_SQL_ORACLE: true  # Ensures SQL files are validated with Oracle dialect
-          VALIDATE_PYTHON_PYLINT: false
 
