@@ -86,4 +86,5 @@ jobs:
           FILTER_REGEX_EXCLUDE: "^(/github/workspace/MtdrSpring/RESETDATABASE.sql|/github/workspace/MtdrSpring/DDL.sql|/github/workspace/test/Dockerfile)$"
           # Specify Oracle dialect for SQL linting
           VALIDATE_SQL_ORACLE: true  # Ensures SQL files are validated with Oracle dialect
+          LINTER_SQLFLUFF_DIALECT: oracle
 
