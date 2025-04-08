@@ -3,16 +3,26 @@ package com.springboot.MyTodoList.service;
 import java.util.List;
 import java.util.Optional;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.springboot.MyTodoList.model.Tarea;
-import com.springboot.MyTodoList.repository.TareaRepository;
+import com.springboot.MyTodoList.repository.TareaRespositories.TareaRepository;
 
 @Service
 public class TareaService {
+
+    private static final Logger logger = LoggerFactory.getLogger(TareaService.class);
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Autowired
     private TareaRepository tareaRepository;
@@ -91,4 +101,7 @@ public class TareaService {
         }
     }
 
+    public Tarea updateTareaWithProcedure(Tarea tarea) {
+        return tareaRepository.updateTareaProcedure(tarea);
+    }
 }

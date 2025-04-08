@@ -125,7 +125,9 @@ public class BotController extends TelegramLongPollingBot {
 				int tareaId = chatTareaIdMap.get(chatId);
 	
 				// Obtener la tarea actual
-				Tarea tarea = tareaService.getItemById(tareaId).getBody();
+				Tarea tareacopy = tareaService.getItemById(tareaId).getBody();
+				Tarea tarea = tareacopy;
+				
 				if (tarea != null) {
 					try {
 						// Actualizar el campo correspondiente
@@ -162,7 +164,7 @@ public class BotController extends TelegramLongPollingBot {
 								return;
 						}	
 						// Actualizar la tarea en la base de datos
-						tareaService.updateTarea(tareaId, tarea);
+						tareaService.updateTareaWithProcedure(tarea);
 			
 						// Enviar un mensaje de confirmación al usuario
 						BotHelper.sendMessageToTelegram(chatId, "Field " + field + " has been updated succesfully!", this);
@@ -171,11 +173,14 @@ public class BotController extends TelegramLongPollingBot {
 						showTaskModificationMenu(chatId, tarea);
 
 					} catch (Exception e) {
-						// Enviar un mensaje de confirmación al usuario
 						BotHelper.sendMessageToTelegram(chatId, "Field " + field + " could not be updated.", this);
 						logger.error("Error actualizando los datos", e);
+						if(field.equals("Due date")){
+							BotHelper.sendMessageToTelegram(chatId, "Verify that the format is valid and the due date is in the range of the sprint dates.", this);
+						}
+						// Enviar un mensaje de confirmación al usuario
 						// Mostrar nuevamente el menú de modificación de la tarea
-						showTaskModificationMenu(chatId, tarea);
+						showTaskModificationMenu(chatId, tareacopy);
 					}
 				} else {
 					BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + tareaId, this);
@@ -868,8 +873,12 @@ public class BotController extends TelegramLongPollingBot {
 				Tarea tarea = tareaResponse.getBody();
 				if(idSprint != 0){
 					tarea.setIdSprint(idSprint); // Actualizar el sprint
+					tarea.setFechaVencimiento(sprintsService.getItemById(idSprint).getBody().getFechaFin());
+					tarea.setfechaInicio(sprintsService.getItemById(idSprint).getBody().getFechaInicio());
 				} else {
 					tarea.setIdSprint(null);
+					tarea.setFechaCompletado(null);
+					tarea.setfechaInicio(null);
 				}
 				tareaService.updateTarea(idTarea, tarea); // Guardar los cambios
 	

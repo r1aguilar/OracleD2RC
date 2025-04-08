@@ -3,6 +3,9 @@ package com.springboot.MyTodoList.service;
 import java.util.List;
 import java.util.Optional;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +16,7 @@ import com.springboot.MyTodoList.repository.UsuarioRepository;
 
 @Service
 public class UsuarioService {
-
+    
     @Autowired
     private UsuarioRepository UsuarioRepository;
 
@@ -94,5 +97,4 @@ public class UsuarioService {
             return null;
         }
     }
-
 }
