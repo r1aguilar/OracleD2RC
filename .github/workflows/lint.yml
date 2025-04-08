@@ -83,7 +83,7 @@ jobs:
           VALIDATE_KUBEVAL: false
           VALIDATE_CHECKOV: false
           VALIDATE_PYTHON_PYLINT: false
-          FILTER_REGEX_EXCLUDE: "^(MtdrSpring/RESETDATABASE.sql|MtdrSpring/DDL.sql|MtdrSpring/backend/Dockerfile)$"
+          FILTER_REGEX_EXCLUDE: "^(/github/workspace/MtdrSpring/RESETDATABASE.sql|/github/workspace/MtdrSpring/DDL.sql|/github/workspace/test/Dockerfile)$"
           # Specify Oracle dialect for SQL linting
           VALIDATE_SQL_ORACLE: true  # Ensures SQL files are validated with Oracle dialect
 
