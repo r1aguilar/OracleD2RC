@@ -23,3 +23,5 @@ jobs:
           VALIDATE_ALL_CODEBASE: false
           VALIDATE_JAVA: true
           JAVACHECKSTYLE_FILE: .github/config/checkstyle.xml
+          VALIDATE_SQLFLUFF: true
+          SQLFLUFF_DIALECT: oracle
