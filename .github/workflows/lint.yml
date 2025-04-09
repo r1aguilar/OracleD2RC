@@ -94,6 +94,6 @@ jobs:
           VALIDATE_KUBEVAL: false
           VALIDATE_CHECKOV: false
           VALIDATE_PYTHON_PYLINT: false
-          FILTER_REGEX_EXCLUDE: "^(/github/workspace/MtdrSpring/RESETDATABASE.sql|/github/workspace/MtdrSpring/DDL.sql|/github/workspace/test/Dockerfile)$"
+          FILTER_REGEX_EXCLUDE: "^(/github/workspace/MtdrSpring/RESETDATABASE.sql|/github/workspace/MtdrSpring/DDL.sql|/github/workspace/test/Dockerfile|/github/workspace/MtdrSpring/DML.sql)$"
 
 
