@@ -23,6 +23,15 @@ jobs:
         with:
           fetch-depth: 0  # Full git history needed
 
+      - name: Debug .sqlfluff config  
+        run: |
+          echo "PWD: $(pwd)"
+          echo "Listing root folder:"
+          ls -la
+          echo "Contents of .sqlfluff:"
+          cat .sqlfluff
+      
+          
       - name: Selenium Test
         continue-on-error: true
         run: |
