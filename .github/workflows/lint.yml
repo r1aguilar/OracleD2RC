@@ -59,6 +59,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_ALL_CODEBASE: true
           VALIDATE_SQL_ORACLE: true
+          LINTER_SQLFLUFF_CONFIG_FILE: .sqlfluff
           VALIDATE_KUBERNETES_KUBECONFORM: false
           VALIDATE_SHELL_SHFMT: false
           VALIDATE_CSS: false
