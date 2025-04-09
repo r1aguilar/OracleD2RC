@@ -1,2 +1,14 @@
 [sqlfluff]
 dialect = oracle
+
+[sqlfluff:rules]
+max_line_length = 200  # Cambia el límite de línea larga
+
+[sqlfluff:rules:CP02]
+capitalisation_policy = consistent  # Opción: upper / lower / consistent / quoted
+
+[sqlfluff:rules:LT05]
+max_line_length = 200  # Puedes aumentar el límite o desactivar
+
+[sqlfluff:rules:LT12]
+force_enable = false  # Para desactivar el final en blanco
