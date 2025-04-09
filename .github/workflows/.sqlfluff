@@ -1,0 +1,14 @@
+# .sqlfluff
+
+[sqlfluff]
+dialect = oracle  # This matches your env setting
+
+# Optional: set paths or overrides
+exclude_rules = L009,L031
+templater = jinja
+
+[sqlfluff:rules]
+max_line_length = 120
+
+[sqlfluff:layout:type]
+# Add any other specific rule configs here
