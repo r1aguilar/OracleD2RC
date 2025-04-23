@@ -11,12 +11,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.springboot.MyTodoList.model.Tarea;
 import com.springboot.MyTodoList.service.TareaService;
 
 @RestController
+@RequestMapping("/pruebas")
 public class TareaController {
     @Autowired
     private TareaService tareaService;
@@ -44,6 +46,16 @@ public class TareaController {
     @GetMapping(value = "/TareasUsuario/{id}")
     public List<Tarea> getAllTareasAceptadasDeveloper(@PathVariable int id){
         return tareaService.findAllTasksFromProjectForUser(id);
+    }
+
+    @GetMapping(value = "/TareasProyecto/{id}")
+    public List<Tarea> getAllTareasAceptadasProyecto(@PathVariable int id){
+        return tareaService.findAllTasksFromProject(id);
+    }
+
+    @GetMapping(value = "/TareasSprint/{id}")
+    public List<Tarea> getAllTareasAceptadasSprint(@PathVariable int id){
+        return tareaService.findAllTasksFromSprintForManager(id);
     }
 
     @PostMapping(value = "/Tareas")

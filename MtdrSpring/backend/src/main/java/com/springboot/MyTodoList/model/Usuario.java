@@ -1,6 +1,8 @@
 package com.springboot.MyTodoList.model;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.List;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -9,12 +11,25 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Entity
 @Table(name = "USUARIO")
 @JsonIgnoreProperties(value = {"password", "idTelegram"})
-public class Usuario {
+public class Usuario implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID_USUARIO")
@@ -38,19 +53,39 @@ public class Usuario {
     @Column(name = "ID_TELEGRAM")
     Long idTelegram;
 
-    public Usuario(){}
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority(manager ? "DEVELOPER" : "MANAGER"));
+    }
 
-    public Usuario(int ID, String username, String name, String correo_p, String phone, String password, OffsetDateTime fecha_creacion, boolean manager, boolean deleted, Long id_telegram){
-        this.id_usuario = ID;
-        this.username = username;
-        this.nombre = name;
-        this.correo = correo_p;
-        this.telefono = phone;
-        this.fechaCreacion = fecha_creacion;
-        this.password = password;
-        this.manager = manager;
-        this.deleted = deleted;
-        this.idTelegram = id_telegram;
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    @Override
+    public String getUsername() {
+        return correo;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
     }
 
     public int getID(){
@@ -61,7 +96,7 @@ public class Usuario {
         this.id_usuario = Id;
     }
 
-    public long getIdTelegram(){
+    public Long getIdTelegram(){
         return idTelegram;
     }
 
@@ -69,7 +104,7 @@ public class Usuario {
         this.idTelegram = id_telegram;
     }
     
-    public String getUsername(){
+    public String getUsernameModel(){
         return username;
     }
     
@@ -101,7 +136,7 @@ public class Usuario {
         this.telefono = tel;
     }
 
-    public String getPassword(){
+    public String getPasswordModel(){
         return password;
     }
 

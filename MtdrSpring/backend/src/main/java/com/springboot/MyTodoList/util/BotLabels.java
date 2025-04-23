@@ -19,7 +19,7 @@ public enum BotLabels {
 	CREATE_PROJECT("Create Project"),
 	DELETE_PROJECT("Delete Project"),
 	EDIT_PROJECT("Edit Project"),
-	VIEW_TASKS("View Tasks"),
+	VIEW_REPORTS("View Reports"),
 	UPDATE_TASK_STATUS("Update Task Status"),
 	CREATE_TASK_DEVELOPER("Propose Task"),
 	VIEW_REMINDERS("View Reminders"),

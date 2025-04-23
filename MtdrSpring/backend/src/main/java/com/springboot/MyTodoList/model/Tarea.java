@@ -18,7 +18,7 @@ public class Tarea {
     int idTarea;
 
     @Column(name = "ID_USUARIO", nullable = true)
-    int idEncargado;
+    Integer idEncargado;
 
     @Column(name = "ID_PROYECTO", nullable = false)
     int idProyecto;
@@ -72,11 +72,11 @@ public class Tarea {
         return idTarea;
     }
 
-    public int getIdEncargado() {
+    public Integer getIdEncargado() {
         return idEncargado;
     }
 
-    public void setIdEncargado(int encargado) {
+    public void setIdEncargado(Integer encargado) {
         this.idEncargado = encargado;
     }
 
@@ -88,7 +88,7 @@ public class Tarea {
         this.idProyecto = idProyecto;
     }
 
-    public int getIdColumna() {
+    public Integer getIdColumna() {
         return idColumna;
     }
 

@@ -47,6 +47,31 @@ public class TareaService {
         return tareasNoAceptadas;
     }
 
+    public List<Tarea> findAllTasksFromProject(int idProyecto){
+        List<Tarea> tareasAceptadasDelProyecto = tareaRepository.findByAceptadaAndIdProyecto(1, idProyecto);
+        return tareasAceptadasDelProyecto;
+    }
+
+    public List<Tarea> findAllTasksFromSprintForUserWithColumn(int idSprint, int idEncargado, int idColumna){
+        List<Tarea> tareasAceptadasDelSprintDelUsuarioConColumna = tareaRepository.findByAceptadaAndIdSprintAndIdEncargadoAndIdColumna(1, idSprint, idEncargado, idColumna);
+        return tareasAceptadasDelSprintDelUsuarioConColumna;
+    }
+
+    public List<Tarea> findAllTasksFromProjectForUserWithColumn(int idEncargado, int idColumna){
+        List<Tarea> tareasAceptadaDelUsuarioConColumna = tareaRepository.findByAceptadaAndIdEncargadoAndIdColumna(1, idEncargado, idColumna);
+        return tareasAceptadaDelUsuarioConColumna;
+    }
+
+    public List<Tarea> findAllTasksFromSprintForManager(int idSprint){
+        List<Tarea> tareasAceptadasDelSprintParaManager = tareaRepository.findByAceptadaAndIdSprint(1, idSprint);
+        return tareasAceptadasDelSprintParaManager;
+    }
+
+    public List<Tarea> findAllTasksFromBacklogForManager(int idProyecto){
+        List<Tarea> tareasAceptadasDelBacklogParaManager = tareaRepository.findByAceptadaAndIdProyectoAndIdSprintIsNull(1, idProyecto);
+        return tareasAceptadasDelBacklogParaManager;
+    }
+
     public List<Tarea> findAllTasksInSprintForUser(int idSprint, int idEncargado){
         List<Tarea> tareasNoAceptadas = tareaRepository.findByAceptadaAndIdSprintAndIdEncargado(1, idSprint, idEncargado);
         return tareasNoAceptadas;
