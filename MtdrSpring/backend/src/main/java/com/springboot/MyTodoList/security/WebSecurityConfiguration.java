@@ -29,6 +29,8 @@ public class WebSecurityConfiguration {
                 .requestMatchers(
                     new AntPathRequestMatcher("/"),
                     new AntPathRequestMatcher("/pruebas/**"),
+                    new AntPathRequestMatcher("/pruebasUser/**"),
+                    new AntPathRequestMatcher("/pruebasProy/**"),
                     new AntPathRequestMatcher("/auth/**")
                 ).permitAll() // Publicly accessible: root + /auth/**
                 .anyRequest().authenticated() // Everything else requires authentication

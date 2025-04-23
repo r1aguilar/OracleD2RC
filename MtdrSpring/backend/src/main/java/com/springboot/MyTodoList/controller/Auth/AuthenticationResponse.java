@@ -7,9 +7,21 @@ import lombok.NoArgsConstructor;
 
 @Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
 public class AuthenticationResponse {
     private int id;
     private String token;
+
+    public AuthenticationResponse(int id, String token){
+        this.id = id;
+        this.token = token;
+    }
+
+    public int getId(){
+        return this.id;
+    }
+
+    public String getToken(){
+        return this.token;
+    }
 }

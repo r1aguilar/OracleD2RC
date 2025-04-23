@@ -18,7 +18,7 @@ import com.springboot.MyTodoList.model.Proyecto;
 import com.springboot.MyTodoList.service.ProyectoService;
 
 @RestController
-@RequestMapping("/pruebas")
+@RequestMapping("/pruebasProy")
 public class ProyectoController {
     @Autowired
     private ProyectoService proeyctoService;

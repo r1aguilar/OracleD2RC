@@ -1,5 +1,7 @@
 package com.springboot.MyTodoList.controller;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -15,10 +17,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.springboot.MyTodoList.model.Usuario;
+import com.springboot.MyTodoList.model.loginRequestCorreo;
+import com.springboot.MyTodoList.model.loginRequestTelefono;
 import com.springboot.MyTodoList.service.UsuarioService;
 
 @RestController
-@RequestMapping("/pruebas")
+@RequestMapping("/pruebasUser")
 public class UsuarioController {
     @Autowired
     private UsuarioService usuarioService;
@@ -38,23 +42,31 @@ public class UsuarioController {
         }
     }
 
-    @GetMapping(value = "/login/{telefono}/{contrasena}")
-    public ResponseEntity<Usuario> loginUsuario(@PathVariable String telefono, @PathVariable String contrasena) {
+    @PostMapping(value = "/login")
+    public ResponseEntity<Usuario> loginUsuarioPorTelefono(@RequestBody loginRequestTelefono loginRequest) {
         try {
-            ResponseEntity<Usuario> responseEntity = usuarioService.loginByTelefono(telefono, contrasena);
+            ResponseEntity<Usuario> responseEntity = usuarioService.loginByTelefono(
+                loginRequest.gettelefono(), loginRequest.getPassword()
+            );
             return new ResponseEntity<>(responseEntity.getBody(), HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
     }
 
-    @GetMapping(value = "/login/email/{correo}/{contrasena}")
-    public ResponseEntity<Usuario> loginUsuarioPorCorreo(@PathVariable String correo, @PathVariable String contrasena) {
+    @PostMapping(value = "/login/email")
+    public ResponseEntity<Object> loginUsuarioPorCorreo(@RequestBody loginRequestCorreo loginRequest) {
         try {
-            ResponseEntity<Usuario> responseEntity = usuarioService.loginByCorreo(correo, contrasena);
+            ResponseEntity<Usuario> responseEntity = usuarioService.loginByCorreo(
+                loginRequest.getCorreo(), loginRequest.getPassword()
+            );
             return new ResponseEntity<>(responseEntity.getBody(), HttpStatus.OK);
         } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("correo", loginRequest.getCorreo());
+            errorResponse.put("password", loginRequest.getPassword());
+            errorResponse.put("errorMessage", e.getMessage());
+            return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
         }
     }
 

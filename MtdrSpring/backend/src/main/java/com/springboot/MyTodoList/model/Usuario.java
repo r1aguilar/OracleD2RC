@@ -17,15 +17,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
 @Builder
-@AllArgsConstructor
-@NoArgsConstructor
 @Entity
 @Table(name = "USUARIO")
 @JsonIgnoreProperties(value = {"password", "idTelegram"})
@@ -52,6 +48,32 @@ public class Usuario implements UserDetails {
     boolean deleted;
     @Column(name = "ID_TELEGRAM")
     Long idTelegram;
+
+    public Usuario(
+        int id_usuario,
+        String username,
+        String nombre,
+        String correo,
+        String telefono,
+        String password,
+        OffsetDateTime fechaCreacion,
+        boolean manager,
+        boolean deleted,
+        Long idTelegram
+    ) {
+        this.id_usuario = id_usuario;
+        this.username = username;
+        this.nombre = nombre;
+        this.correo = correo;
+        this.telefono = telefono;
+        this.password = password;
+        this.fechaCreacion = fechaCreacion;
+        this.manager = manager;
+        this.deleted = deleted;
+        this.idTelegram = idTelegram;
+    }
+
+    public Usuario(){}
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -40,16 +40,19 @@ public class AuthenticationService {
     }
 
     public AuthenticationResponse register(RegisterRequest request){
-        Usuario usuario = Usuario.builder()
-            .username(request.getUsuario())
-            .nombre(request.getNombre())
-            .correo(request.getCorreo())
-            .telefono(request.getTelefono())
-            .password(passwordEncoder.encode(request.getPassword()))
-            .fechaCreacion(OffsetDateTime.parse(request.getFechaCreacion()))
-            .manager(request.getManager())
-            .deleted(request.getDeleted())
-            .build();
+        Usuario usuario = new Usuario(
+            0, // or whatever default/placeholder value you want for `id_usuario` if it's auto-generated
+            request.getUsuario(),
+            request.getNombre(),
+            request.getCorreo(),
+            request.getTelefono(),
+            passwordEncoder.encode(request.getPassword()),
+            OffsetDateTime.parse(request.getFechaCreacion()),
+            request.getManager(),
+            request.getDeleted(),
+            null // or the actual value for idTelegram if you have one
+        );
+
         
         usuarioRepository.save(usuario);
         var user = usuarioRepository.findByCorreo(request.getCorreo()).orElseThrow();
@@ -58,10 +61,7 @@ public class AuthenticationService {
         // Save or update token
         saveOrUpdateToken(user.getID(), jwtToken);
 
-        return AuthenticationResponse.builder()
-            .id(user.getID())
-            .token(jwtToken)
-            .build();
+        return new AuthenticationResponse(user.getID(), jwtToken);
     }
 
     public AuthenticationResponse authenticate(AuthenticationRequest request){
@@ -77,10 +77,7 @@ public class AuthenticationService {
         // Save or update token
         saveOrUpdateToken(user.getID(), jwtToken);
 
-        return AuthenticationResponse.builder()
-            .id(user.getID())
-            .token(jwtToken)
-            .build();
+        return new AuthenticationResponse(user.getID(), jwtToken);
     }
 
     public AuthenticationResponse authenticateWithTelefono(AuthenticationRequestTelefono request){
@@ -96,9 +93,6 @@ public class AuthenticationService {
         // Save or update token
         saveOrUpdateToken(user.getID(), jwtToken);
 
-        return AuthenticationResponse.builder()
-            .id(user.getID())
-            .token(jwtToken)
-            .build();
+        return new AuthenticationResponse(user.getID(), jwtToken);
     }
 }
