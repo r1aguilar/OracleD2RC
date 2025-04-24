@@ -77,6 +77,16 @@ public class TareaService {
         return tareasNoAceptadas;
     }
 
+    public List<Tarea> findAllTasksFromSprintWithColumn(int idSprint, int idColumn){
+        List<Tarea> tareasAceptadasDelSprintParaManager = tareaRepository.findByAceptadaAndIdSprintAndIdColumna(1, idSprint, idColumn);
+        return tareasAceptadasDelSprintParaManager;
+    }
+
+    public List<Tarea> findAllTasksFromProjectWithColumn(int idProyecto, int idColumn){
+        List<Tarea> tareasAceptadasDelSprintParaManager = tareaRepository.findByAceptadaAndIdProyectoAndIdColumna(1, idProyecto, idColumn);
+        return tareasAceptadasDelSprintParaManager;
+    }
+
     public ResponseEntity<Tarea> getItemById(int id){
         Optional<Tarea> userByID = tareaRepository.findById(id);
         if (userByID.isPresent()){

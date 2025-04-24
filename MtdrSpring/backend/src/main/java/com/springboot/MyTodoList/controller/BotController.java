@@ -1322,6 +1322,231 @@ public class BotController extends TelegramLongPollingBot {
 			String[] parts = callbackData.split(" ");
 			int proyId = Integer.parseInt(parts[1]);
 			showProjectSprintsForManageTasks(chatId, proyId);
+		} else if (callbackData.startsWith("LIST_MANAGER_DEVELOPER_KPIS")){
+			String[] parts = callbackData.split(" ");
+			int idColumna = Integer.parseInt(parts[1]);
+			int idSprint = Integer.parseInt(parts[2]);
+			int idEncargado = Integer.parseInt(parts[3]);
+			showManagerDeveloperTasks(chatId, idColumna, idSprint, idEncargado);
+		} else if (callbackData.startsWith("BACK_TO_KPIS_MANAGER_SHOW")) {
+			// Regresar al menu de seleccion de proyectos para ver kpis
+			String[] parts = callbackData.split(" ");
+			int sprintId = Integer.parseInt(parts[1]);
+			int proyId = Integer.parseInt(parts[2]);
+			showKPIsReportManagerFiltered(chatId, sprintId, proyId);
+		} else if (callbackData.startsWith("LIST_MANAGER_TEAM_KPIS")){
+			String[] parts = callbackData.split(" ");
+			int idColumna = Integer.parseInt(parts[1]);
+			int idSprint = Integer.parseInt(parts[2]);
+			int idProyecto = Integer.parseInt(parts[3]);
+			showManagerListTeamTasks(chatId, idColumna, idSprint, idProyecto);
+		}
+	}
+
+	private void showManagerListTeamTasks(long chatId, int idColumna, int idSprint, int idProyecto){
+		try {
+			List<Tarea> tasks = new ArrayList();
+			String typeTask = "";
+			switch(idColumna){
+				case 1:
+					typeTask = "Pending";
+					break;
+				case 2:
+					typeTask = "Doing";
+					break;
+				case 3:
+					typeTask = "Done";
+					break;
+				default:
+					break;
+			}
+
+			String scope = "Project";
+			if(idSprint != 0){
+				scope = sprintsService.getItemById(idSprint).getBody().getNombre();
+				tasks = tareaService.findAllTasksFromSprintWithColumn(idSprint, idColumna);
+			} else {
+				tasks = tareaService.findAllTasksFromProjectWithColumn(idProyecto, idColumna);
+			}
+
+			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+			List<InlineKeyboardButton> titleRow = new ArrayList<>();
+			InlineKeyboardButton TitleButton = new InlineKeyboardButton();
+			TitleButton.setCallbackData("NO_ACTION");
+			TitleButton.setText("List of " + typeTask  + " tasks for " + scope);
+			titleRow.add(TitleButton);
+			rowsInline.add(titleRow);
+
+			// Aqui tengo que listar todas las tareas ya sea pending doing o done dependiendo del sprint y la columna
+			for(Tarea tarea : tasks){
+				List<InlineKeyboardButton> rowInline = new ArrayList<>();
+				List<InlineKeyboardButton> row2Inline = new ArrayList<>();
+				List<InlineKeyboardButton> row3Inline = new ArrayList<>();
+				List<InlineKeyboardButton> row4Inline = new ArrayList<>();
+				InlineKeyboardButton taskNameButton = new InlineKeyboardButton();
+				InlineKeyboardButton userNameButton = new InlineKeyboardButton();
+				InlineKeyboardButton statusButton = new InlineKeyboardButton();
+				InlineKeyboardButton sprintButton = new InlineKeyboardButton();
+				taskNameButton.setText(tarea.getNombre());
+				taskNameButton.setCallbackData("NO_ACTION");
+				statusButton.setText(idColumnaStringReturn(tarea.getIdColumna()));
+				statusButton.setCallbackData("NO_ACTION");
+				if(tarea.getIdSprint() == null){
+					sprintButton.setText("Backlog");
+				} else{
+					sprintButton.setText(sprintsService.getItemById(tarea.getIdSprint()).getBody().getNombre());
+				}
+				sprintButton.setCallbackData("NO_ACTION");
+				if(tarea.getIdEncargado() == null){
+					userNameButton.setText("Not assigned");
+				} else{
+					userNameButton.setText(usuarioService.getItemById(tarea.getIdEncargado()).getBody().getNombre());
+				}
+				userNameButton.setCallbackData("NO_ACTION");
+				rowInline.add(taskNameButton);
+				row2Inline.add(userNameButton);
+				row3Inline.add(statusButton);
+				row3Inline.add(sprintButton);
+				
+				if(idColumna == 3){
+					InlineKeyboardButton estimatedTimeButton = new InlineKeyboardButton();
+					InlineKeyboardButton realTimeButton = new InlineKeyboardButton();
+					estimatedTimeButton.setText("ET: " + String.valueOf(tarea.getTiempoEstimado()));
+					estimatedTimeButton.setCallbackData("NO_ACTION");
+					realTimeButton.setText("RT: " + String.valueOf(tarea.getTiempoReal()));
+					realTimeButton.setCallbackData("NO_ACTION");
+					row3Inline.add(estimatedTimeButton);
+					row3Inline.add(realTimeButton);
+				}
+
+				InlineKeyboardButton division = new InlineKeyboardButton();
+				division.setText("---------------------------------");
+				division.setCallbackData("NO_ACTION");
+				row4Inline.add(division);
+				
+				rowsInline.add(rowInline);
+				rowsInline.add(row2Inline);
+				rowsInline.add(row3Inline);
+				rowsInline.add(row4Inline);
+			}
+
+			// Botón de regresar
+			List<InlineKeyboardButton> backRow = new ArrayList<>();
+			InlineKeyboardButton backButton = new InlineKeyboardButton();
+			backButton.setText("Go back to view KPIs");
+			backButton.setCallbackData("BACK_TO_KPIS_MANAGER_SHOW " + idSprint + " " + idProyecto);
+			backRow.add(backButton);
+			rowsInline.add(backRow);
+
+			inlineKeyboardMarkup.setKeyboard(rowsInline);
+			SendMessage messageToTelegram = new SendMessage();
+			messageToTelegram.setChatId(chatId);
+			messageToTelegram.setText("Listing all " + typeTask + " tasks");
+			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+			execute(messageToTelegram);
+
+		} catch (TelegramApiException e) {
+		}
+	}
+
+	private void showManagerDeveloperTasks(long chatId, int idColumna, int idSprint, int idEncargado){
+		try {
+			List<Tarea> tasks = new ArrayList();
+			String typeTask = "";
+			switch(idColumna){
+				case 1:
+					typeTask = "Pending";
+					break;
+				case 2:
+					typeTask = "Doing";
+					break;
+				case 3:
+					typeTask = "Done";
+					break;
+				default:
+					break;
+			}
+
+			String scope = "Project";
+			if(idSprint != 0){
+				scope = sprintsService.getItemById(idSprint).getBody().getNombre();
+				tasks = tareaService.findAllTasksFromSprintForUserWithColumn(idSprint, idEncargado, idColumna);
+			} else {
+				tasks = tareaService.findAllTasksFromProjectForUserWithColumn(idEncargado, idColumna);
+			}
+
+			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+			List<InlineKeyboardButton> titleRow = new ArrayList<>();
+			InlineKeyboardButton TitleButton = new InlineKeyboardButton();
+			TitleButton.setCallbackData("NO_ACTION");
+			TitleButton.setText("List of " + typeTask  + " tasks for " + scope);
+			titleRow.add(TitleButton);
+			rowsInline.add(titleRow);
+
+			// Aqui tengo que listar todas las tareas ya sea pending doing o done dependiendo del sprint y la columna
+			for(Tarea tarea : tasks){
+				List<InlineKeyboardButton> rowInline = new ArrayList<>();
+				List<InlineKeyboardButton> row2Inline = new ArrayList<>();
+				List<InlineKeyboardButton> row3Inline = new ArrayList<>();
+				InlineKeyboardButton taskNameButton = new InlineKeyboardButton();
+				InlineKeyboardButton statusButton = new InlineKeyboardButton();
+				InlineKeyboardButton sprintButton = new InlineKeyboardButton();
+				taskNameButton.setText(tarea.getNombre());
+				taskNameButton.setCallbackData("NO_ACTION");
+				statusButton.setText(idColumnaStringReturn(tarea.getIdColumna()));
+				statusButton.setCallbackData("NO_ACTION");
+				if(tarea.getIdSprint() == null){
+					sprintButton.setText("Backlog");
+				} else{
+					sprintButton.setText(sprintsService.getItemById(tarea.getIdSprint()).getBody().getNombre());
+				}
+				sprintButton.setCallbackData("NO_ACTION");
+				rowInline.add(taskNameButton);
+				rowsInline.add(rowInline);
+
+				row2Inline.add(statusButton);
+				row2Inline.add(sprintButton);
+
+				if(idColumna == 3){
+					InlineKeyboardButton estimatedTimeButton = new InlineKeyboardButton();
+					InlineKeyboardButton realTimeButton = new InlineKeyboardButton();
+					estimatedTimeButton.setText("ET: " + String.valueOf(tarea.getTiempoEstimado()));
+					estimatedTimeButton.setCallbackData("NO_ACTION");
+					realTimeButton.setText("RT: " + String.valueOf(tarea.getTiempoReal()));
+					realTimeButton.setCallbackData("NO_ACTION");
+					row2Inline.add(estimatedTimeButton);
+					row2Inline.add(realTimeButton);
+				}
+				
+				InlineKeyboardButton division = new InlineKeyboardButton();
+				division.setText("---------------------------------");
+				division.setCallbackData("NO_ACTION");
+				row3Inline.add(division);
+
+				rowsInline.add(row2Inline);
+				rowsInline.add(row3Inline);
+			}
+
+			// Botón de regresar
+			List<InlineKeyboardButton> backRow = new ArrayList<>();
+			InlineKeyboardButton backButton = new InlineKeyboardButton();
+			backButton.setText("Go back to view KPIs for that sprint");
+			// Get the project of the user in question
+			int idProy = equipoService.getItemById(integrantesEquipoService.getItemByIdUsuario(idEncargado).getBody().getIdEquipo()).getBody().getIdProyecto();
+			backButton.setCallbackData("BACK_TO_KPIS_MANAGER_SHOW " + idSprint + " " + idProy);
+			backRow.add(backButton);
+			rowsInline.add(backRow);
+
+			inlineKeyboardMarkup.setKeyboard(rowsInline);
+			SendMessage messageToTelegram = new SendMessage();
+			messageToTelegram.setChatId(chatId);
+			messageToTelegram.setText("Listing all " + typeTask + " tasks for " + usuarioService.getItemById(idEncargado).getBody().getNombre() + " in " + scope);
+			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+			execute(messageToTelegram);
+
+		} catch (TelegramApiException e) {
 		}
 	}
 
@@ -1402,9 +1627,9 @@ public class BotController extends TelegramLongPollingBot {
 			tasksDoneTitleButton.setText("Done");
 			tasksDoingTitleButton.setText("Doing");
 			tasksPendingTitleButton.setText("Pending");
-			tasksDoneTitleButton.setCallbackData("NO_ACTION");
-			tasksDoingTitleButton.setCallbackData("NO_ACTION");
-			tasksPendingTitleButton.setCallbackData("NO_ACTION");
+			tasksDoneTitleButton.setCallbackData("LIST_MANAGER_TEAM_KPIS 3 " + sprintId + " " + proyectId);
+			tasksDoingTitleButton.setCallbackData("LIST_MANAGER_TEAM_KPIS 2 " + sprintId + " " + proyectId);
+			tasksPendingTitleButton.setCallbackData("LIST_MANAGER_TEAM_KPIS 1 " + sprintId + " " + proyectId);
 			tasksSubtitileRow.add(tasksDoneTitleButton);
 			tasksSubtitileRow.add(tasksDoingTitleButton);
 			tasksSubtitileRow.add(tasksPendingTitleButton);
@@ -1418,9 +1643,9 @@ public class BotController extends TelegramLongPollingBot {
 			tasksDoneButton.setText(String.valueOf(countDone));
 			tasksDoingButton.setText(String.valueOf(countDoing));
 			tasksPendingButton.setText(String.valueOf(countPending));
-			tasksDoneButton.setCallbackData("NO_ACTION");
-			tasksDoingButton.setCallbackData("NO_ACTION");
-			tasksPendingButton.setCallbackData("NO_ACTION");
+			tasksDoneButton.setCallbackData("LIST_MANAGER_TEAM_KPIS 3 " + sprintId + " " + proyectId);
+			tasksDoingButton.setCallbackData("LIST_MANAGER_TEAM_KPIS 2 " + sprintId + " " + proyectId);
+			tasksPendingButton.setCallbackData("LIST_MANAGER_TEAM_KPIS 1 " + sprintId + " " + proyectId);
 			tasksCountRow.add(tasksDoneButton);
 			tasksCountRow.add(tasksDoingButton);
 			tasksCountRow.add(tasksPendingButton);
@@ -1548,9 +1773,9 @@ public class BotController extends TelegramLongPollingBot {
 				tasksUserDoneTitleButton.setText("Done");
 				tasksUserDoingTitleButton.setText("Doing");
 				tasksUserPendingTitleButton.setText("Pending");
-				tasksUserDoneTitleButton.setCallbackData("NO_ACTION");
-				tasksUserDoingTitleButton.setCallbackData("NO_ACTION");
-				tasksUserPendingTitleButton.setCallbackData("NO_ACTION");
+				tasksUserDoneTitleButton.setCallbackData("LIST_MANAGER_DEVELOPER_KPIS 3 " + sprintId + " " + userIdLocal);
+				tasksUserDoingTitleButton.setCallbackData("LIST_MANAGER_DEVELOPER_KPIS 2 " + sprintId + " " + userIdLocal);
+				tasksUserPendingTitleButton.setCallbackData("LIST_MANAGER_DEVELOPER_KPIS 1 " + sprintId + " " + userIdLocal);
 				tasksUserSubtitileRow.add(tasksUserDoneTitleButton);
 				tasksUserSubtitileRow.add(tasksUserDoingTitleButton);
 				tasksUserSubtitileRow.add(tasksUserPendingTitleButton);
@@ -1564,9 +1789,9 @@ public class BotController extends TelegramLongPollingBot {
 				tasksUserDoneButton.setText(String.valueOf(countDoneLocal));
 				tasksUserDoingButton.setText(String.valueOf(countDoingLocal));
 				tasksUserPendingButton.setText(String.valueOf(countPendingLocal));
-				tasksUserDoneButton.setCallbackData("NO_ACTION");
-				tasksUserDoingButton.setCallbackData("NO_ACTION");
-				tasksUserPendingButton.setCallbackData("NO_ACTION");
+				tasksUserDoneButton.setCallbackData("LIST_MANAGER_DEVELOPER_KPIS 3 " + sprintId + " " + userIdLocal);
+				tasksUserDoingButton.setCallbackData("LIST_MANAGER_DEVELOPER_KPIS 2 " + sprintId + " " + userIdLocal);
+				tasksUserPendingButton.setCallbackData("LIST_MANAGER_DEVELOPER_KPIS 1 " + sprintId + " " + userIdLocal);
 				tasksUserCountRow.add(tasksUserDoneButton);
 				tasksUserCountRow.add(tasksUserDoingButton);
 				tasksUserCountRow.add(tasksUserPendingButton);
@@ -2011,6 +2236,8 @@ public class BotController extends TelegramLongPollingBot {
 			// Aqui tengo que listar todas las tareas ya sea pending doing o done dependiendo del sprint y la columna
 			for(Tarea tarea : tasks){
 				List<InlineKeyboardButton> rowInline = new ArrayList<>();
+				List<InlineKeyboardButton> row2Inline = new ArrayList<>();
+				List<InlineKeyboardButton> row3Inline = new ArrayList<>();
 				InlineKeyboardButton taskNameButton = new InlineKeyboardButton();
 				InlineKeyboardButton statusButton = new InlineKeyboardButton();
 				InlineKeyboardButton sprintButton = new InlineKeyboardButton();
@@ -2025,9 +2252,29 @@ public class BotController extends TelegramLongPollingBot {
 				}
 				sprintButton.setCallbackData("NO_ACTION");
 				rowInline.add(taskNameButton);
-				rowInline.add(statusButton);
-				rowInline.add(sprintButton);
+				row2Inline.add(statusButton);
+				row2Inline.add(sprintButton);
+
 				rowsInline.add(rowInline);
+
+				if(idColumna == 3){
+					InlineKeyboardButton estimatedTimeButton = new InlineKeyboardButton();
+					InlineKeyboardButton realTimeButton = new InlineKeyboardButton();
+					estimatedTimeButton.setText("ET: " + String.valueOf(tarea.getTiempoEstimado()));
+					estimatedTimeButton.setCallbackData("NO_ACTION");
+					realTimeButton.setText("RT: " + String.valueOf(tarea.getTiempoReal()));
+					realTimeButton.setCallbackData("NO_ACTION");
+					row2Inline.add(estimatedTimeButton);
+					row2Inline.add(realTimeButton);
+				}
+
+				InlineKeyboardButton division = new InlineKeyboardButton();
+				division.setText("---------------------------------");
+				division.setCallbackData("NO_ACTION");
+				row3Inline.add(division);
+
+				rowsInline.add(row2Inline);
+				rowsInline.add(row3Inline);
 			}
 
 			// Botón de regresar

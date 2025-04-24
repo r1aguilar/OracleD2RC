@@ -40,6 +40,15 @@ public class TareaRepositoryCustomImpl implements TareaRepositoryCustom {
             query.registerStoredProcedureParameter("p_fechavencimiento", OffsetDateTime.class, ParameterMode.IN);
             query.registerStoredProcedureParameter("p_fechacompletado", OffsetDateTime.class, ParameterMode.IN);
 
+            ((org.hibernate.procedure.ParameterRegistration) query.getParameter("p_tiemporeal")).enablePassingNulls(true);
+            ((org.hibernate.procedure.ParameterRegistration) query.getParameter("p_descripcion")).enablePassingNulls(true);
+            ((org.hibernate.procedure.ParameterRegistration) query.getParameter("p_id_usuario")).enablePassingNulls(true);
+            ((org.hibernate.procedure.ParameterRegistration) query.getParameter("p_id_sprint")).enablePassingNulls(true);
+            ((org.hibernate.procedure.ParameterRegistration) query.getParameter("p_tiempoestimado")).enablePassingNulls(true);
+            ((org.hibernate.procedure.ParameterRegistration) query.getParameter("p_fechainicio")).enablePassingNulls(true);
+            ((org.hibernate.procedure.ParameterRegistration) query.getParameter("p_fechavencimiento")).enablePassingNulls(true);
+            ((org.hibernate.procedure.ParameterRegistration) query.getParameter("p_fechacompletado")).enablePassingNulls(true);
+
             query.setParameter("p_id_tarea", tarea.getIdTarea());
             query.setParameter("p_id_proyecto", tarea.getIdProyecto());
             query.setParameter("p_aceptada", tarea.getAceptada());
@@ -50,7 +59,7 @@ public class TareaRepositoryCustomImpl implements TareaRepositoryCustom {
             query.setParameter("p_id_columna", tarea.getIdColumna());
             query.setParameter("p_id_sprint", tarea.getIdSprint());
             query.setParameter("p_storypoints", tarea.getStoryPoints());
-            query.setParameter("p_tiemporeal", tarea.getTiempoReal());
+            query.setParameter("p_tiemporeal", tarea.getTiempoReal() != null ? tarea.getTiempoReal() : null);
             query.setParameter("p_deleted", tarea.getDeleted());
             query.setParameter("p_tiempoestimado", tarea.getTiempoEstimado());
             query.setParameter("p_fechainicio", tarea.getfechaInicio());
