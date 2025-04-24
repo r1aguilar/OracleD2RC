@@ -15,6 +15,7 @@ public enum BotLabels {
 	MANAGE_PROJECTS("Manage Projects"),
 	MANAGE_TEAMS("Manage Teams"),
 	MANAGE_TASKS("Manage Tasks"),
+	MANAGER_KPIS_REPORT("View Manager Reports"),
 	SHOW_NOT_ACCEPTED_TASKS("Show Not Accepted Tasks"),
 	CREATE_PROJECT("Create Project"),
 	DELETE_PROJECT("Delete Project"),

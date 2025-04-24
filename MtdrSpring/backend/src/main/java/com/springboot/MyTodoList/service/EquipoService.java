@@ -31,6 +31,15 @@ public class EquipoService {
         }
     }
 
+    public ResponseEntity<Equipo> findEquipoByIdProyecto(int idProyecto){
+        Optional<Equipo> equipo  = equipoRepository.findByIdProyecto(idProyecto);
+        if (equipo.isPresent()){
+            return new ResponseEntity<>(equipo.get(), HttpStatus.OK);
+        }else{
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
     public Equipo addEquipo(Equipo Equipo){
         return equipoRepository.save(Equipo);
     }

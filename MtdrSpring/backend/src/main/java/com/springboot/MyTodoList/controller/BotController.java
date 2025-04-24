@@ -339,6 +339,73 @@ public class BotController extends TelegramLongPollingBot {
 				} catch (NumberFormatException e) {
 					BotHelper.sendMessageToTelegram(chatId, "Please input a valid number", this);
 				}
+			} else if (chatState.startsWith("WAITING_FOR_MANAGER_UPDATE_TASK_")){
+				String field = chatState.replace("WAITING_FOR_MANAGER_UPDATE_TASK_", "");
+				int tareaId = chatTareaIdMap.get(chatId);
+	
+				// Obtener la tarea actual
+				Tarea tareacopy = tareaService.getItemById(tareaId).getBody();
+				Tarea tarea = tareacopy;
+				
+				if (tarea != null) {
+					try {
+						// Actualizar el campo correspondiente
+						switch (field) {
+							case "Name":
+								tarea.setNombre(messageTextFromTelegram);
+								break;
+							case "Description":
+								tarea.setDescripcion(messageTextFromTelegram);
+								break;
+							case "Priority":
+								tarea.setPrioridad(Integer.parseInt(messageTextFromTelegram));
+								break;
+							case "Sprint":
+								tarea.setIdSprint(Integer.parseInt(messageTextFromTelegram));
+								break;
+							case "Due date":
+								// Verificar si el usuario ingresó solo la fecha (YYYY-MM-DD)
+								String fechaIngresada = messageTextFromTelegram.trim();
+								if (fechaIngresada.matches("\\d{4}-\\d{2}-\\d{2}")) {
+									fechaIngresada += "T23:59:59Z"; // Agregar la hora para que OffsetDateTime.parse no falle
+								}
+								tarea.setFechaVencimiento(OffsetDateTime.parse(fechaIngresada));
+								break;
+							case "Story Points":
+								tarea.setStoryPoints(Integer.parseInt(messageTextFromTelegram));
+								break;
+							case "Estimated Time":
+								tarea.setTiempoEstimado(Integer.parseInt(messageTextFromTelegram));
+								break;
+							default:
+								// Manejar campos no reconocidos
+								BotHelper.sendMessageToTelegram(chatId, "Not recognized field: " + field, this);
+								return;
+						}	
+						// Actualizar la tarea en la base de datos
+						tareaService.updateTareaWithProcedure(tarea);
+			
+						// Enviar un mensaje de confirmación al usuario
+						BotHelper.sendMessageToTelegram(chatId, "Field " + field + " has been updated succesfully!", this);
+		
+						clearChatState(chatId);
+
+						// Mostrar nuevamente el menú de modificación de la tarea
+						showManagerEditTaskMenu(chatId, tarea.getIdTarea());
+
+					} catch (Exception e) {
+						BotHelper.sendMessageToTelegram(chatId, "Field " + field + " could not be updated.", this);
+						logger.error("Error actualizando los datos", e);
+						if(field.equals("Due date")){
+							BotHelper.sendMessageToTelegram(chatId, "Verify that the format is valid and the due date is in the range of the sprint dates.", this);
+						}
+						// Enviar un mensaje de confirmación al usuario
+						// Mostrar nuevamente el menú de modificación de la tarea
+						showManagerEditTaskMenu(chatId, tareacopy.getIdTarea());
+					}
+				} else {
+					BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + tareaId, this);
+				}
 			}
 		} else if (messageTextFromTelegram.equals(BotCommands.LOGIN_COMMAND.getCommand()) || messageTextFromTelegram.equals(BotCommands.START.getCommand())) {
 			loginChatbot(chatId, update);
@@ -364,8 +431,59 @@ public class BotController extends TelegramLongPollingBot {
 			viewKPISDeveloperMenu(chatId);
 		} else if (messageTextFromTelegram.equals(BotLabels.MANAGE_TASKS.getLabel())) {
 			manageTasksManagerMenu(chatId);
+		} else if (messageTextFromTelegram.equals(BotLabels.MANAGER_KPIS_REPORT.getLabel())) {
+			selectProjectForKPISReportManager(chatId);
 		} else {
 			BotHelper.sendMessageToTelegram(chatId, "Message not recognized, please try again", this);
+		}
+	}
+
+	private void selectProjectForKPISReportManager(long chatId){
+		ResponseEntity<Usuario> usuario = usuarioService.getItemByTelegramId(userTelegramId);
+
+		try {
+			if(usuario.getBody() != null){
+				Usuario userManager = usuario.getBody();
+				List<Proyecto> proyectosDelManager = proyectoService.findAllProjectsForManager(userManager.getID());
+	
+				InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+				List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+	
+				// Agregar el primer renglón con el título
+				List<InlineKeyboardButton> titleRow = new ArrayList<>();
+				InlineKeyboardButton titleButton = new InlineKeyboardButton();
+				titleButton.setText("Projects list");
+				titleButton.setCallbackData("NO_ACTION");
+				titleRow.add(titleButton);
+				rowsInline.add(titleRow);
+	
+				for (Proyecto proy : proyectosDelManager) {
+					List<InlineKeyboardButton> rowInline = new ArrayList<>();
+					InlineKeyboardButton proyButton = new InlineKeyboardButton();
+					proyButton.setText(proy.getNombre());
+					proyButton.setCallbackData("MANAGER_KPIS_SELECT_PROJECT " + proy.getID());
+					rowInline.add(proyButton);
+					rowsInline.add(rowInline);
+				}
+	
+				InlineKeyboardButton mainManagerMenuButton = new InlineKeyboardButton();
+				mainManagerMenuButton.setText("Back to manager main menu");
+				mainManagerMenuButton.setCallbackData("BACK_TO_MANAGER_MAIN_MENU");
+				List<InlineKeyboardButton> backRow = new ArrayList<>();
+				backRow.add(mainManagerMenuButton);
+				rowsInline.add(backRow);
+	
+				inlineKeyboardMarkup.setKeyboard(rowsInline);
+				SendMessage messageToTelegram = new SendMessage();
+				messageToTelegram.setChatId(chatId);
+				messageToTelegram.setText("Select project to see the respective KPIs reports:");
+				messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+				execute(messageToTelegram);
+			}
+		} catch (TelegramApiException e) {
+			logger.error(e.getLocalizedMessage(), e);
+		} catch (Exception e) {
+			logger.error("Error obtaining not accepted tasks", e);
 		}
 	}
 
@@ -1059,10 +1177,631 @@ public class BotController extends TelegramLongPollingBot {
 				idToSend = Integer.parseInt(isNull);
 			}
 			showTasksForEditingManager(chatId, idToSend, proyId);
+		} else if (callbackData.startsWith("MANAGER_EDIT_TASK_SET_SPRINT")) {
+			// Manejar la selección de un sprint específico
+			String[] parts = callbackData.split(" ");
+			int idTarea = Integer.parseInt(parts[1]);
+			int idSprint = Integer.parseInt(parts[2]);
+	
+			// Obtener la tarea actual
+			ResponseEntity<Tarea> tareaResponse = tareaService.getItemById(idTarea);
+			if (tareaResponse.getBody() != null) {
+				Tarea tarea = tareaResponse.getBody();
+				if(idSprint != 0){
+					tarea.setIdSprint(idSprint); // Actualizar el sprint
+					tarea.setFechaVencimiento(sprintsService.getItemById(idSprint).getBody().getFechaFin());
+					tarea.setfechaInicio(sprintsService.getItemById(idSprint).getBody().getFechaInicio());
+				} else {
+					tarea.setIdSprint(null);
+					tarea.setFechaCompletado(null);
+					tarea.setfechaInicio(null);
+				}
+				tareaService.updateTarea(idTarea, tarea); // Guardar los cambios
+	
+				// Regresar al menú de modificación de tareas
+				showManagerEditTaskMenu(chatId, tarea.getIdTarea());
+			} else {
+				BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + idTarea, this);
+			}
+		} else if (callbackData.startsWith("MANAGER_EDIT_TASK_SET_RESPONSIBLE")) {
+			// Manejar la selección de un sprint específico
+			String[] parts = callbackData.split(" ");
+			int idTarea = Integer.parseInt(parts[1]);
+			int idUser = Integer.parseInt(parts[2]);
+	
+			// Obtener la tarea actual
+			ResponseEntity<Tarea> tareaResponse = tareaService.getItemById(idTarea);
+			if (tareaResponse.getBody() != null) {
+				Tarea tarea = tareaResponse.getBody();
+				if(idUser != 0){
+					tarea.setIdEncargado(idUser); // Actualizar el sprint
+				} else {
+					tarea.setIdEncargado(null);
+				}
+				tareaService.updateTarea(idTarea, tarea); // Guardar los cambios
+
+				BotHelper.sendMessageToTelegram(chatId, "Changed task responsible succesfully", this);
+	
+				// Regresar al menú de modificación de tareas
+				showManagerEditTaskMenu(chatId, idTarea);
+			} else {
+				BotHelper.sendMessageToTelegram(chatId, "No task found with ID: " + idTarea, this);
+			}
 		} else if (callbackData.startsWith("MANAGER_EDIT_TASK")) {
 			String[] parts = callbackData.split(" ");
 			int taskId = Integer.parseInt(parts[1]);
 			showManagerEditTaskMenu(chatId, taskId);
+		} else if (callbackData.startsWith("SELECT_SPRINT_MANAGER_EDIT_TASK")) {
+			String[] parts = callbackData.split(" ");
+			int taskId = Integer.parseInt(parts[1]);
+			showSprintsToEditTaskManager(chatId, taskId);
+		} else if (callbackData.startsWith("SELECT_RESPONSIBLE_MANAGER_EDIT_TASK")) {
+			String[] parts = callbackData.split(" ");
+			int taskId = Integer.parseInt(parts[1]);
+			showTeamMembersToManagerEditTask(chatId, taskId);
+		} else if (callbackData.startsWith("MANAGER_UPDATE_TASK_")) {
+
+			// Dividir el callbackData por el espacio
+			String[] parts = callbackData.split(" ");
+        
+			// Si el array tiene tres partes (indica que el campo tiene dos palabras)
+			String field = "";
+			int tareaId = 0;
+	
+			if (parts.length == 3) {
+				// Si son tres partes, entonces el campo está compuesto por dos palabras
+				field = parts[0].replace("MANAGER_UPDATE_TASK_", "") + " " + parts[1]; // Concatenar las dos primeras partes
+				tareaId = Integer.parseInt(parts[2].split("/")[0]); // El ID de tarea se encuentra en la última parte
+			} else if (parts.length == 2) {
+				// Si son dos partes, entonces el campo es de una sola palabra
+				field = parts[0].replace("MANAGER_UPDATE_TASK_", ""); // El campo es la primera parte
+				tareaId = Integer.parseInt(parts[1].split("/")[0]); // El ID de tarea es la segunda parte
+			}
+
+			// Guardar el estado del chat
+			saveChatState(chatId, "WAITING_FOR_MANAGER_UPDATE_TASK_" + field, tareaId);
+
+			// Definir mensaje según el campo
+			String message;
+			switch (field) {
+				case "Priority":
+					message = "Please write the number depending on the priority you want to select:\n"
+							+ "1. Low\n"
+							+ "2. Medium\n"
+							+ "3. High";
+					break;
+				case "Due date":
+					message = "Please write the due date for the task in the format YYYY-MM-DD";
+					break;
+				case "Estimated time":
+					message = "Please write the estimated time for each task, consider that the unit is hours";
+					break;
+				default:
+					message = "Please write the new value for " + field;
+					break;
+			}
+			// Enviar mensaje al usuario
+			BotHelper.sendMessageToTelegram(chatId, message, this);
+		} else if (callbackData.startsWith("MANAGER_KPIS_SELECT_PROJECT")) {
+			String[] parts = callbackData.replace("MANAGER_KPIS_SELECT_PROJECT ", "").split("/");
+			int proyectoId = Integer.parseInt(parts[0]);
+
+			Proyecto proyecto = proyectoService.getItemById(proyectoId).getBody();
+			if (proyecto != null) {
+				// Mostrar el menú para ver KPIs por sprint o proyecto entero
+				showKPIsManagerSelectMenu(chatId, proyecto.getID());
+			} else {
+				BotHelper.sendMessageToTelegram(chatId, "No project found with ID: " + proyectoId, this);
+			}
+		} else if (callbackData.equals("BACK_TO_MANAGER_VIEW_KPIS_SELECT_PROJECT_MENU")) {
+			// Regresar al menu de seleccion de proyectos para ver kpis
+			selectProjectForKPISReportManager(chatId);
+		} else if (callbackData.startsWith("MANAGER_VIEW_KPIS_SELECT_SPRINT")) {
+			String[] parts = callbackData.split(" ");
+			int sprintId = Integer.parseInt(parts[1]);
+			int proyId = Integer.parseInt(parts[2]);
+			// Regresar al menu de seleccion de proyectos para ver kpis
+			showKPIsReportManagerFiltered(chatId, sprintId, proyId);
+		} else if (callbackData.startsWith("BACK_TO_MANAGER_VIEW_KPIS_SELECT_SPRINT_MENU")) {
+			// Regresar al menu de seleccion de proyectos para ver kpis
+			String[] parts = callbackData.split(" ");
+			int proyId = Integer.parseInt(parts[1]);
+			showKPIsManagerSelectMenu(chatId, proyId);
+		} else if (callbackData.startsWith("BACK_TO_KPIS_DEVELOPER_SHOW")) {
+			// Regresar al menu de seleccion de proyectos para ver kpis
+			String[] parts = callbackData.split(" ");
+			int sprintId = Integer.parseInt(parts[1]);
+			viewKPIsDeveloper(chatId, sprintId);
+		} else if (callbackData.startsWith("BACK_TO_MANAGER_EDIT_TASK_SPRINT_SELECTION")) {
+			// Regresar al menu de seleccion de proyectos para ver kpis
+			String[] parts = callbackData.split(" ");
+			int proyId = Integer.parseInt(parts[1]);
+			showProjectSprintsForManageTasks(chatId, proyId);
+		} else if (callbackData.startsWith("BACK_TO_MANAGER_TASKS_PROJECTS")) {
+			// Regresar al menu de seleccion de proyectos para ver kpis
+			String[] parts = callbackData.split(" ");
+			int proyId = Integer.parseInt(parts[1]);
+			showProjectSprintsForManageTasks(chatId, proyId);
+		}
+	}
+
+	private void showKPIsReportManagerFiltered(long chatId, int sprintId, int proyectId){
+		// Aqui va todo el menu del KPI report pal manager
+		try {
+			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+			List<InlineKeyboardButton> titleRow = new ArrayList<>();
+			InlineKeyboardButton TitleButton = new InlineKeyboardButton();
+			TitleButton.setCallbackData("NO_ACTION");
+
+			List<Tarea> tareas;
+
+			// Si idSprint 0 entonces son las tareas del proyecto
+			if(sprintId == 0){
+				// Obtener todas las tareas del proyecto
+				tareas = tareaService.findAllTasksFromProject(proyectId);
+				TitleButton.setText("KPIs for Project");
+			}
+			else{
+				// Obtener todas las tareas del sprint
+				tareas = tareaService.findAllTasksFromSprintForManager(sprintId);
+				String nameSprint = sprintsService.getItemById(sprintId).getBody().getNombre();
+				TitleButton.setText("KPIs for " + nameSprint);
+			}
+
+			titleRow.add(TitleButton);
+			rowsInline.add(titleRow);
+
+			// Despues de obtener la lista de tareas, obtener la suma de las horas estimadas como horas estimadas de trabajo, junto a las horas de trabajo reales
+			// de igual forma obtener la cantidad de tareas contra las tareas completadas
+			// Contadores de tareas por columna
+			int countPending = 0; // idColumna == 1
+			int countDoing = 0;   // idColumna == 2
+			int countDone = 0;    // idColumna == 3
+		
+			// Sumas de tiempos
+			int totalEstimated = 0;
+			int totalReal = 0;
+		
+			for (Tarea tarea : tareas) {
+				if (null != tarea.getIdColumna()) switch (tarea.getIdColumna()) {
+					case 1:
+						countPending++;
+						break;
+					case 2:
+						countDoing++;
+						break;
+					case 3:
+						countDone++;
+						break;
+					default:
+						break;
+				}
+			
+				if (tarea.getTiempoEstimado() != null) {
+					totalEstimated += tarea.getTiempoEstimado();
+				}
+			
+				if (tarea.getTiempoReal() != null) {
+					totalReal += tarea.getTiempoReal();
+				}
+			}
+
+			// Tasks KPIs
+			List<InlineKeyboardButton> taskTitleRow = new ArrayList<>();
+			InlineKeyboardButton taskTitleButton = new InlineKeyboardButton();
+			taskTitleButton.setText("TASKS");
+			taskTitleButton.setCallbackData("NO_ACTION");
+			taskTitleRow.add(taskTitleButton);
+			rowsInline.add(taskTitleRow);
+
+			List<InlineKeyboardButton> tasksSubtitileRow = new ArrayList<>();
+			InlineKeyboardButton tasksDoneTitleButton = new InlineKeyboardButton();
+			InlineKeyboardButton tasksDoingTitleButton = new InlineKeyboardButton();
+			InlineKeyboardButton tasksPendingTitleButton = new InlineKeyboardButton();
+			tasksDoneTitleButton.setText("Done");
+			tasksDoingTitleButton.setText("Doing");
+			tasksPendingTitleButton.setText("Pending");
+			tasksDoneTitleButton.setCallbackData("NO_ACTION");
+			tasksDoingTitleButton.setCallbackData("NO_ACTION");
+			tasksPendingTitleButton.setCallbackData("NO_ACTION");
+			tasksSubtitileRow.add(tasksDoneTitleButton);
+			tasksSubtitileRow.add(tasksDoingTitleButton);
+			tasksSubtitileRow.add(tasksPendingTitleButton);
+			rowsInline.add(tasksSubtitileRow);
+
+			// Mostrar tareas done, doing, pending
+			List<InlineKeyboardButton> tasksCountRow = new ArrayList<>();
+			InlineKeyboardButton tasksDoneButton = new InlineKeyboardButton();
+			InlineKeyboardButton tasksDoingButton = new InlineKeyboardButton();
+			InlineKeyboardButton tasksPendingButton = new InlineKeyboardButton();
+			tasksDoneButton.setText(String.valueOf(countDone));
+			tasksDoingButton.setText(String.valueOf(countDoing));
+			tasksPendingButton.setText(String.valueOf(countPending));
+			tasksDoneButton.setCallbackData("NO_ACTION");
+			tasksDoingButton.setCallbackData("NO_ACTION");
+			tasksPendingButton.setCallbackData("NO_ACTION");
+			tasksCountRow.add(tasksDoneButton);
+			tasksCountRow.add(tasksDoingButton);
+			tasksCountRow.add(tasksPendingButton);
+			rowsInline.add(tasksCountRow);
+
+			// Hours KPIs
+			List<InlineKeyboardButton> HoursTitleRow = new ArrayList<>();
+			InlineKeyboardButton HoursTitleButton = new InlineKeyboardButton();
+			HoursTitleButton.setText("HOURS");
+			HoursTitleButton.setCallbackData("NO_ACTION");
+			HoursTitleRow.add(HoursTitleButton);
+			rowsInline.add(HoursTitleRow);
+
+			List<InlineKeyboardButton> hoursSubtitileRow = new ArrayList<>();
+			InlineKeyboardButton hoursEstimatedTitleButton = new InlineKeyboardButton();
+			InlineKeyboardButton hoursRealTitleButton = new InlineKeyboardButton();
+			hoursEstimatedTitleButton.setText("Estimated");
+			hoursRealTitleButton.setText("Real");
+			hoursEstimatedTitleButton.setCallbackData("NO_ACTION");
+			hoursRealTitleButton.setCallbackData("NO_ACTION");
+			hoursSubtitileRow.add(hoursEstimatedTitleButton);
+			hoursSubtitileRow.add(hoursRealTitleButton);
+			rowsInline.add(hoursSubtitileRow);
+
+			// Mostrar horas estimadas y horas reales
+			List<InlineKeyboardButton> hoursCountRow = new ArrayList<>();
+			InlineKeyboardButton hoursEstimatedButton = new InlineKeyboardButton();
+			InlineKeyboardButton hoursRealButton = new InlineKeyboardButton();
+			hoursEstimatedButton.setText(String.valueOf(totalEstimated));
+			hoursRealButton.setText(String.valueOf(totalReal));
+			hoursEstimatedButton.setCallbackData("NO_ACTION");
+			hoursRealButton.setCallbackData("NO_ACTION");
+			hoursCountRow.add(hoursEstimatedButton);
+			hoursCountRow.add(hoursRealButton);
+			rowsInline.add(hoursCountRow);
+
+			// Division Row
+			List<InlineKeyboardButton> divisionRow = new ArrayList<>();
+			InlineKeyboardButton divisionButton = new InlineKeyboardButton();
+			divisionButton.setText("-----------------------------------------");
+			divisionButton.setCallbackData("NO_ACTION");
+			divisionRow.add(divisionButton);
+			rowsInline.add(divisionRow);
+
+			// Termina el reporte general y empieza el reporte por integrante del equipo
+			// Obtener el id del equipo a traves del proyecto
+			Equipo equipo = equipoService.findEquipoByIdProyecto(proyectId).getBody();
+
+			// A traves del id del equipo obtener la lista de integrantesEquipo
+			List<IntegrantesEquipo> integrantes = integrantesEquipoService.findAllByIdEquipo(equipo.getIdEquipo());
+
+			// Con la lista de intregrantes, ahora a hacer la lista de usuarios
+			List<Usuario> usuariosDelEquipo = new ArrayList<>();
+			for(IntegrantesEquipo integrante : integrantes){
+				usuariosDelEquipo.add(usuarioService.getItemById(integrante.getIdUsuario()).getBody());
+			}
+
+			for(Usuario user : usuariosDelEquipo){
+				List<Tarea> tareasUsuario;
+				Integer userIdLocal = user.getID();
+
+				// Si idSprint 0 entonces son las tareas del proyecto
+				if(sprintId == 0){
+					// Obtener todas las tareas del proyecto
+					tareasUsuario = tareaService.findAllTasksFromProjectForUser(userIdLocal);
+				}
+				else{
+					// Obtener todas las tareas del sprint
+					tareasUsuario = tareaService.findAllTasksInSprintForUser(sprintId, userIdLocal);
+				}
+
+				// Despues de obtener la lista de tareas, obtener la suma de las horas estimadas como horas estimadas de trabajo, junto a las horas de trabajo reales
+				// de igual forma obtener la cantidad de tareas contra las tareas completadas
+				// Contadores de tareas por columna
+				int countPendingLocal = 0; // idColumna == 1
+				int countDoingLocal = 0;   // idColumna == 2
+				int countDoneLocal = 0;    // idColumna == 3
+			
+				// Sumas de tiempos
+				int totalEstimatedLocal = 0;
+				int totalRealLocal = 0;
+			
+				for (Tarea tarea : tareasUsuario) {
+					if (null != tarea.getIdColumna()) switch (tarea.getIdColumna()) {
+						case 1:
+							countPendingLocal++;
+							break;
+						case 2:
+							countDoingLocal++;
+							break;
+						case 3:
+							countDoneLocal++;
+							break;
+						default:
+							break;
+					}
+				
+					if (tarea.getTiempoEstimado() != null) {
+						totalEstimatedLocal += tarea.getTiempoEstimado();
+					}
+				
+					if (tarea.getTiempoReal() != null) {
+						totalRealLocal += tarea.getTiempoReal();
+					}
+				}
+
+				List<InlineKeyboardButton> userNameRow = new ArrayList<>();
+				InlineKeyboardButton userNameButton = new InlineKeyboardButton();
+				userNameButton.setCallbackData("NO_ACTION");
+				userNameButton.setText(user.getNombre());
+				userNameRow.add(userNameButton);
+				rowsInline.add(userNameRow);
+
+				List<InlineKeyboardButton> taskUserTitleRow = new ArrayList<>();
+				InlineKeyboardButton taskUserTitleButton = new InlineKeyboardButton();
+				taskUserTitleButton.setText("TASKS");
+				taskUserTitleButton.setCallbackData("NO_ACTION");
+				taskUserTitleRow.add(taskUserTitleButton);
+				rowsInline.add(taskUserTitleRow);
+
+				List<InlineKeyboardButton> tasksUserSubtitileRow = new ArrayList<>();
+				InlineKeyboardButton tasksUserDoneTitleButton = new InlineKeyboardButton();
+				InlineKeyboardButton tasksUserDoingTitleButton = new InlineKeyboardButton();
+				InlineKeyboardButton tasksUserPendingTitleButton = new InlineKeyboardButton();
+				tasksUserDoneTitleButton.setText("Done");
+				tasksUserDoingTitleButton.setText("Doing");
+				tasksUserPendingTitleButton.setText("Pending");
+				tasksUserDoneTitleButton.setCallbackData("NO_ACTION");
+				tasksUserDoingTitleButton.setCallbackData("NO_ACTION");
+				tasksUserPendingTitleButton.setCallbackData("NO_ACTION");
+				tasksUserSubtitileRow.add(tasksUserDoneTitleButton);
+				tasksUserSubtitileRow.add(tasksUserDoingTitleButton);
+				tasksUserSubtitileRow.add(tasksUserPendingTitleButton);
+				rowsInline.add(tasksUserSubtitileRow);
+
+				// Mostrar tareas done, doing, pending
+				List<InlineKeyboardButton> tasksUserCountRow = new ArrayList<>();
+				InlineKeyboardButton tasksUserDoneButton = new InlineKeyboardButton();
+				InlineKeyboardButton tasksUserDoingButton = new InlineKeyboardButton();
+				InlineKeyboardButton tasksUserPendingButton = new InlineKeyboardButton();
+				tasksUserDoneButton.setText(String.valueOf(countDoneLocal));
+				tasksUserDoingButton.setText(String.valueOf(countDoingLocal));
+				tasksUserPendingButton.setText(String.valueOf(countPendingLocal));
+				tasksUserDoneButton.setCallbackData("NO_ACTION");
+				tasksUserDoingButton.setCallbackData("NO_ACTION");
+				tasksUserPendingButton.setCallbackData("NO_ACTION");
+				tasksUserCountRow.add(tasksUserDoneButton);
+				tasksUserCountRow.add(tasksUserDoingButton);
+				tasksUserCountRow.add(tasksUserPendingButton);
+				rowsInline.add(tasksUserCountRow);
+
+				// Hours KPIs
+				List<InlineKeyboardButton> HoursUserTitleRow = new ArrayList<>();
+				InlineKeyboardButton HoursUserTitleButton = new InlineKeyboardButton();
+				HoursUserTitleButton.setText("HOURS");
+				HoursUserTitleButton.setCallbackData("NO_ACTION");
+				HoursUserTitleRow.add(HoursUserTitleButton);
+				rowsInline.add(HoursUserTitleRow);
+
+				List<InlineKeyboardButton> hoursUserSubtitileRow = new ArrayList<>();
+				InlineKeyboardButton hoursUserEstimatedTitleButton = new InlineKeyboardButton();
+				InlineKeyboardButton hoursUserRealTitleButton = new InlineKeyboardButton();
+				hoursUserEstimatedTitleButton.setText("Estimated");
+				hoursUserRealTitleButton.setText("Real");
+				hoursUserEstimatedTitleButton.setCallbackData("NO_ACTION");
+				hoursUserRealTitleButton.setCallbackData("NO_ACTION");
+				hoursUserSubtitileRow.add(hoursUserEstimatedTitleButton);
+				hoursUserSubtitileRow.add(hoursUserRealTitleButton);
+				rowsInline.add(hoursUserSubtitileRow);
+
+				// Mostrar horas estimadas y horas reales
+				List<InlineKeyboardButton> hoursUserCountRow = new ArrayList<>();
+				InlineKeyboardButton hoursUserEstimatedButton = new InlineKeyboardButton();
+				InlineKeyboardButton hoursUserRealButton = new InlineKeyboardButton();
+				hoursUserEstimatedButton.setText(String.valueOf(totalEstimatedLocal));
+				hoursUserRealButton.setText(String.valueOf(totalRealLocal));
+				hoursUserEstimatedButton.setCallbackData("NO_ACTION");
+				hoursUserRealButton.setCallbackData("NO_ACTION");
+				hoursUserCountRow.add(hoursUserEstimatedButton);
+				hoursUserCountRow.add(hoursUserRealButton);
+				rowsInline.add(hoursUserCountRow);
+
+				// Division Row
+				List<InlineKeyboardButton> divisionRowLocal = new ArrayList<>();
+				InlineKeyboardButton divisionButtonLocal = new InlineKeyboardButton();
+				divisionButtonLocal.setText("-----------------------------------------");
+				divisionButtonLocal.setCallbackData("NO_ACTION");
+				divisionRowLocal.add(divisionButtonLocal);
+				rowsInline.add(divisionRowLocal);
+			}
+
+			// Boton de regresar al menu de visualizar KPIs
+			List<InlineKeyboardButton> backRow = new ArrayList<>();
+			InlineKeyboardButton backButton = new InlineKeyboardButton();
+			backButton.setText("Go back to KPIs sprint selection menu");
+			backButton.setCallbackData("BACK_TO_MANAGER_VIEW_KPIS_SELECT_SPRINT_MENU " + proyectId);
+			backRow.add(backButton);
+			rowsInline.add(backRow);
+
+			inlineKeyboardMarkup.setKeyboard(rowsInline);
+			SendMessage messageToTelegram = new SendMessage();
+			messageToTelegram.setChatId(chatId);
+			messageToTelegram.setText("------------------- KPIs Reports -------------------");
+			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+			execute(messageToTelegram);	
+			
+		} catch (TelegramApiException e) {
+		}
+	}
+
+	private void showKPIsManagerSelectMenu(long chatId, int idProyecto){
+		// Aqui se van a mostrar todos los sprints del proyecto y un boton para ver los KPIs generales
+		try {
+			// Obtener la lista de sprints del proyecto
+			List<Sprints> sprints = sprintsService.findAllSprintsFromProject(idProyecto);
+	
+			// Crear el teclado en línea con los sprints
+			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+			List<InlineKeyboardButton> titleRow = new ArrayList<>();
+			InlineKeyboardButton titleButton = new InlineKeyboardButton();
+			titleButton.setText("Project Sprints");
+			titleButton.setCallbackData("NO_ACTION ");
+			rowsInline.add(titleRow);
+
+			for (Sprints sprint : sprints) {
+				List<InlineKeyboardButton> rowInline = new ArrayList<>();
+				InlineKeyboardButton sprintButton = new InlineKeyboardButton();
+				sprintButton.setText(sprint.getNombre());
+				sprintButton.setCallbackData("MANAGER_VIEW_KPIS_SELECT_SPRINT " + sprint.getID() + " " + idProyecto);
+				rowInline.add(sprintButton);
+				rowsInline.add(rowInline);
+			}
+
+			// Botón de backlog
+			List<InlineKeyboardButton> backlogRow = new ArrayList<>();
+			InlineKeyboardButton backlogButton = new InlineKeyboardButton();
+			backlogButton.setText("Whole Project");
+			backlogButton.setCallbackData("MANAGER_VIEW_KPIS_SELECT_SPRINT " + 0 + " " + idProyecto);
+			backlogRow.add(backlogButton);
+			rowsInline.add(backlogRow);
+
+			// Botón de regresar
+			List<InlineKeyboardButton> backRow = new ArrayList<>();
+			InlineKeyboardButton backButton = new InlineKeyboardButton();
+			backButton.setText("Go back");
+			backButton.setCallbackData("BACK_TO_MANAGER_VIEW_KPIS_SELECT_PROJECT_MENU");
+			backRow.add(backButton);
+			rowsInline.add(backRow);
+
+			inlineKeyboardMarkup.setKeyboard(rowsInline);
+
+			// Enviar el mensaje con los sprints
+			SendMessage messageToTelegram = new SendMessage();
+			messageToTelegram.setChatId(chatId);
+			messageToTelegram.setText("Select a sprint to view KPIs report:");
+			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+			execute(messageToTelegram);
+		} catch (TelegramApiException e) {
+			logger.error("Error showing sprint selection menu", e);
+		}
+	}
+
+	private void showTeamMembersToManagerEditTask(long chatId, int taskId){
+		try {
+			// Obtener la tarea actual
+			ResponseEntity<Tarea> tareaResponse = tareaService.getItemById(taskId);
+			if (tareaResponse.getBody() != null) {
+				Tarea tarea = tareaResponse.getBody();
+				int idProyecto = tarea.getIdProyecto();
+	
+				// Obtener el id del equipo a traves del proyecto
+				Equipo equipo = equipoService.findEquipoByIdProyecto(idProyecto).getBody();
+
+				// A traves del id del equipo obtener la lista de integrantesEquipo
+				List<IntegrantesEquipo> integrantes = integrantesEquipoService.findAllByIdEquipo(equipo.getIdEquipo());
+
+				// Con la lista de intregrantes, ahora a hacer la lista de usuarios
+				List<Usuario> usuariosDelEquipo = new ArrayList<>();
+				for(IntegrantesEquipo integrante : integrantes){
+					usuariosDelEquipo.add(usuarioService.getItemById(integrante.getIdUsuario()).getBody());
+				}
+
+				// Ahora que ya se tiene la lista de usuarios se crean los botones con cada nombre del integrante y su id despues para cambiar en la tarea
+				InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+				List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+				List<InlineKeyboardButton> titleRow = new ArrayList<>();
+				InlineKeyboardButton titleButton = new InlineKeyboardButton();
+				titleButton.setText("Team Members");
+				titleButton.setCallbackData("NO_ACTION ");
+				rowsInline.add(titleRow);
+
+				for (Usuario user : usuariosDelEquipo) {
+					List<InlineKeyboardButton> rowInline = new ArrayList<>();
+					InlineKeyboardButton userButton = new InlineKeyboardButton();
+					userButton.setText(user.getNombre());
+					userButton.setCallbackData("MANAGER_EDIT_TASK_SET_RESPONSIBLE " + taskId + " " + user.getID());
+					rowInline.add(userButton);
+					rowsInline.add(rowInline);
+				}
+
+				List<InlineKeyboardButton> rowInline = new ArrayList<>();
+				InlineKeyboardButton userButton = new InlineKeyboardButton();
+				userButton.setText("Assign no member");
+				userButton.setCallbackData("MANAGER_EDIT_TASK_SET_RESPONSIBLE " + taskId + " " + 0);
+				rowInline.add(userButton);
+				rowsInline.add(rowInline);
+				
+				// Enviar el mensaje con los sprints
+				inlineKeyboardMarkup.setKeyboard(rowsInline);
+				SendMessage messageToTelegram = new SendMessage();
+				messageToTelegram.setChatId(chatId);
+				messageToTelegram.setText("Select a team member to assing the task to:");
+				messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+				execute(messageToTelegram);
+			} else {
+				BotHelper.sendMessageToTelegram(chatId, "No task found with id: " + taskId, this);
+			}
+		} catch (TelegramApiException e) {
+			logger.error("Error showing sprint selection menu", e);
+		}
+	}
+
+	private void showSprintsToEditTaskManager(long chatId, int taskId){
+		try {
+			// Obtener la tarea actual
+			ResponseEntity<Tarea> tareaResponse = tareaService.getItemById(taskId);
+			if (tareaResponse.getBody() != null) {
+				Tarea tarea = tareaResponse.getBody();
+				int idProyecto = tarea.getIdProyecto();
+	
+				// Obtener la lista de sprints del proyecto
+				List<Sprints> sprints = sprintsService.findAllSprintsFromProject(idProyecto);
+	
+				// Crear el teclado en línea con los sprints
+				InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+				List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+				List<InlineKeyboardButton> titleRow = new ArrayList<>();
+				InlineKeyboardButton titleButton = new InlineKeyboardButton();
+				titleButton.setText("Project Sprints");
+				titleButton.setCallbackData("NO_ACTION ");
+				rowsInline.add(titleRow);
+	
+				for (Sprints sprint : sprints) {
+					List<InlineKeyboardButton> rowInline = new ArrayList<>();
+					InlineKeyboardButton sprintButton = new InlineKeyboardButton();
+					sprintButton.setText(sprint.getNombre());
+					sprintButton.setCallbackData("MANAGER_EDIT_TASK_SET_SPRINT " + taskId + " " + sprint.getID());
+					rowInline.add(sprintButton);
+					rowsInline.add(rowInline);
+				}
+
+				// Botón de backlog
+				List<InlineKeyboardButton> backlogRow = new ArrayList<>();
+				InlineKeyboardButton backlogButton = new InlineKeyboardButton();
+				backlogButton.setText("Backlog");
+				backlogButton.setCallbackData("MANAGER_EDIT_TASK_SET_SPRINT " + taskId + " " + 0);
+				backlogRow.add(backlogButton);
+				rowsInline.add(backlogRow);
+	
+				// Botón de regresar
+				List<InlineKeyboardButton> backRow = new ArrayList<>();
+				InlineKeyboardButton backButton = new InlineKeyboardButton();
+				backButton.setText("Go back");
+				backButton.setCallbackData("BACK_TO_MANAGER_TASK_MODIFICATION " + taskId);
+				backRow.add(backButton);
+				rowsInline.add(backRow);
+	
+				inlineKeyboardMarkup.setKeyboard(rowsInline);
+	
+				// Enviar el mensaje con los sprints
+				SendMessage messageToTelegram = new SendMessage();
+				messageToTelegram.setChatId(chatId);
+				messageToTelegram.setText("Select a sprint:");
+				messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
+				execute(messageToTelegram);
+			} else {
+				BotHelper.sendMessageToTelegram(chatId, "No task found with id: " + taskId, this);
+			}
+		} catch (TelegramApiException e) {
+			logger.error("Error showing sprint selection menu", e);
 		}
 	}
 
@@ -1175,6 +1914,13 @@ public class BotController extends TelegramLongPollingBot {
 				rowsInline.add(rowInline);
 			}
 
+			List<InlineKeyboardButton> lastRow = new ArrayList<>();
+			InlineKeyboardButton lastButton = new InlineKeyboardButton();
+			lastButton.setText("Go back");
+			lastButton.setCallbackData("BACK_TO_MANAGER_EDIT_TASK_SPRINT_SELECTION " + idProy);
+			lastRow.add(lastButton);
+			rowsInline.add(lastRow);
+
 			inlineKeyboardMarkup.setKeyboard(rowsInline);
 			SendMessage messageToTelegram = new SendMessage();
 			messageToTelegram.setChatId(chatId);
@@ -1229,18 +1975,7 @@ public class BotController extends TelegramLongPollingBot {
 
 	private void viewListOfTasksKPIs(long chatId, int idColumna, int idSprint, int idEncargado){
 		try {
-			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
-			List<InlineKeyboardButton> titleRow = new ArrayList<>();
-			InlineKeyboardButton TitleButton = new InlineKeyboardButton();
-			TitleButton.setCallbackData("NO_ACTION");
-			TitleButton.setText("KPIs for Project");
-			titleRow.add(TitleButton);
-			rowsInline.add(titleRow);
-
-			inlineKeyboardMarkup.setKeyboard(rowsInline);
-			SendMessage messageToTelegram = new SendMessage();
-			messageToTelegram.setChatId(chatId);
+			List<Tarea> tasks = new ArrayList();
 			String typeTask = "";
 			switch(idColumna){
 				case 1:
@@ -1255,6 +1990,57 @@ public class BotController extends TelegramLongPollingBot {
 				default:
 					break;
 			}
+
+			String scope = "Project";
+			if(idSprint != 0){
+				scope = sprintsService.getItemById(idSprint).getBody().getNombre();
+				tasks = tareaService.findAllTasksFromSprintForUserWithColumn(idSprint, idEncargado, idColumna);
+			} else {
+				tasks = tareaService.findAllTasksFromProjectForUserWithColumn(idEncargado, idColumna);
+			}
+
+			InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+			List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+			List<InlineKeyboardButton> titleRow = new ArrayList<>();
+			InlineKeyboardButton TitleButton = new InlineKeyboardButton();
+			TitleButton.setCallbackData("NO_ACTION");
+			TitleButton.setText("List of " + typeTask  + " tasks for " + scope);
+			titleRow.add(TitleButton);
+			rowsInline.add(titleRow);
+
+			// Aqui tengo que listar todas las tareas ya sea pending doing o done dependiendo del sprint y la columna
+			for(Tarea tarea : tasks){
+				List<InlineKeyboardButton> rowInline = new ArrayList<>();
+				InlineKeyboardButton taskNameButton = new InlineKeyboardButton();
+				InlineKeyboardButton statusButton = new InlineKeyboardButton();
+				InlineKeyboardButton sprintButton = new InlineKeyboardButton();
+				taskNameButton.setText(tarea.getNombre());
+				taskNameButton.setCallbackData("NO_ACTION");
+				statusButton.setText(idColumnaStringReturn(tarea.getIdColumna()));
+				statusButton.setCallbackData("NO_ACTION");
+				if(tarea.getIdSprint() == null){
+					sprintButton.setText("Backlog");
+				} else{
+					sprintButton.setText(sprintsService.getItemById(tarea.getIdSprint()).getBody().getNombre());
+				}
+				sprintButton.setCallbackData("NO_ACTION");
+				rowInline.add(taskNameButton);
+				rowInline.add(statusButton);
+				rowInline.add(sprintButton);
+				rowsInline.add(rowInline);
+			}
+
+			// Botón de regresar
+			List<InlineKeyboardButton> backRow = new ArrayList<>();
+			InlineKeyboardButton backButton = new InlineKeyboardButton();
+			backButton.setText("Go back to view KPIs");
+			backButton.setCallbackData("BACK_TO_KPIS_DEVELOPER_SHOW " + idSprint);
+			backRow.add(backButton);
+			rowsInline.add(backRow);
+
+			inlineKeyboardMarkup.setKeyboard(rowsInline);
+			SendMessage messageToTelegram = new SendMessage();
+			messageToTelegram.setChatId(chatId);
 			messageToTelegram.setText("Listing all " + typeTask + " tasks");
 			messageToTelegram.setReplyMarkup(inlineKeyboardMarkup);
 			execute(messageToTelegram);
@@ -1432,16 +2218,16 @@ public class BotController extends TelegramLongPollingBot {
 			if(userInChat!= null){
 				List<Tarea> tareasDelSprint = tareaService.findAllTasksFromProjectForUser(userInChat.getID());
 				for(Tarea tarea : tareasDelSprint){
-				List<InlineKeyboardButton> rowInline = new ArrayList<>();
-				InlineKeyboardButton taskButton = new InlineKeyboardButton();
-				InlineKeyboardButton statusButton = new InlineKeyboardButton();
-				taskButton.setText(tarea.getNombre());
-				taskButton.setCallbackData("UPDATE_STATUS " + tarea.getIdTarea());
-				statusButton.setText(idColumnaStringReturn(tarea.getIdColumna()));
-				statusButton.setCallbackData("UPDATE_STATUS " + tarea.getIdTarea());
-				rowInline.add(taskButton);
-				rowInline.add(statusButton);
-				rowsInline.add(rowInline);
+					List<InlineKeyboardButton> rowInline = new ArrayList<>();
+					InlineKeyboardButton taskButton = new InlineKeyboardButton();
+					InlineKeyboardButton statusButton = new InlineKeyboardButton();
+					taskButton.setText(tarea.getNombre());
+					taskButton.setCallbackData("UPDATE_STATUS " + tarea.getIdTarea());
+					statusButton.setText(idColumnaStringReturn(tarea.getIdColumna()));
+					statusButton.setCallbackData("UPDATE_STATUS " + tarea.getIdTarea());
+					rowInline.add(taskButton);
+					rowInline.add(statusButton);
+					rowsInline.add(rowInline);
 				}
 			}
 
@@ -1543,6 +2329,11 @@ public class BotController extends TelegramLongPollingBot {
 		row = new KeyboardRow();
 		row.add(BotLabels.MANAGE_TASKS.getLabel());
 		row.add(BotLabels.SHOW_NOT_ACCEPTED_TASKS.getLabel());
+		keyboard.add(row);
+
+		// Third row
+		row = new KeyboardRow();
+		row.add(BotLabels.MANAGER_KPIS_REPORT.getLabel());
 		keyboard.add(row);
 
 		keyboardMarkup.setKeyboard(keyboard);
