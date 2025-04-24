@@ -20,6 +20,8 @@ const AnalyticsManager = () => {
     { name: "Sprint22", date: "Mar 30, 2025", status: "Completed", progress: 100 },
     { name: "Sprint23", date: "Apr 6, 2025", status: "Completed", progress: 100 },
     { name: "Sprint41", date: "Apr 13, 2025", status: "Completed", progress: 100 },
+    { name: "Sprint61", date: "Apr 27, 2025", status: "Completed", progress: 100 },
+
 
   ];
 
