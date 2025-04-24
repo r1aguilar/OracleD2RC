@@ -45,7 +45,7 @@ const DashDev = () => {
     }
   
     try {
-      const response = await fetch(`http://160.34.212.100/pruebas/TareasUsuario/${userId}`);
+      const response = await fetch(`http://localhost:8080/pruebas/TareasUsuario/${userId}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -133,7 +133,7 @@ const DashDev = () => {
   
     // 3. Actualización en el backend usando el endpoint correcto
     try {
-      const response = await fetch(`http://160.34.212.100/pruebas/updateTarea/${movedTask.rawId}`, {
+      const response = await fetch(`http://localhost:8080/pruebas/updateTarea/${movedTask.rawId}`, {
         method: "PUT", // Usando PUT como especifica tu @PutMapping
         headers: {
           "Content-Type": "application/json",

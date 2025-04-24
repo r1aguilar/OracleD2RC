@@ -24,7 +24,7 @@ const LoginScreen = () => {
     }
   
     try {
-      const response = await fetch("http://220.158.67.50/pruebasUser/login/email", {
+      const response = await fetch("http://localhost:8080/pruebasUser/login/email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
