@@ -45,7 +45,7 @@ const DashDev = () => {
     }
   
     try {
-      const response = await fetch(`http://localhost:8080/pruebas/TareasUsuario/${userId}`);
+      const response = await fetch(`/pruebas/TareasUsuario/${userId}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

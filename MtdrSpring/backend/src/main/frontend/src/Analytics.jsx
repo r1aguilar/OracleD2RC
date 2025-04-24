@@ -39,7 +39,7 @@ const AnalyticsManager = () => {
       const sprintNumber = selectedSprint.replace("Sprint", "");
   
       try {
-        const response = await fetch(`http://localhost:8080/pruebas/TareasSprint/${sprintNumber}`);
+        const response = await fetch(`/pruebas/TareasSprint/${sprintNumber}`);
         const data = await response.json();
   
         const formatted = data.map((task) => ({
