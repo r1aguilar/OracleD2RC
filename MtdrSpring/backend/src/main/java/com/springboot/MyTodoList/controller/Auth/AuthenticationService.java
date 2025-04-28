@@ -61,7 +61,7 @@ public class AuthenticationService {
         // Save or update token
         saveOrUpdateToken(user.getID(), jwtToken);
 
-        return new AuthenticationResponse(user.getID(), jwtToken);
+        return new AuthenticationResponse(user, jwtToken);
     }
 
     public AuthenticationResponse authenticate(AuthenticationRequest request){
@@ -77,7 +77,7 @@ public class AuthenticationService {
         // Save or update token
         saveOrUpdateToken(user.getID(), jwtToken);
 
-        return new AuthenticationResponse(user.getID(), jwtToken);
+        return new AuthenticationResponse(user, jwtToken);
     }
 
     public AuthenticationResponse authenticateWithTelefono(AuthenticationRequestTelefono request){
@@ -93,6 +93,6 @@ public class AuthenticationService {
         // Save or update token
         saveOrUpdateToken(user.getID(), jwtToken);
 
-        return new AuthenticationResponse(user.getID(), jwtToken);
+        return new AuthenticationResponse(user, jwtToken);
     }
 }

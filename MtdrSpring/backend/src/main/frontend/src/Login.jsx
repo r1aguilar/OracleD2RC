@@ -16,15 +16,15 @@ const LoginScreen = () => {
   
     let passwordToSend;
     if (password === "admin") {
-      passwordToSend = "$2a$12$94Fmc41Em5pPymRMfk.wjObvXttvu/aDE/4aGl4SQ8ZCOGWzL6h3G";
+      passwordToSend = "admin";
     } else if (password === "123") {
-      passwordToSend = "$2a$12$E7.M6ukX3OAN3f1WixuGru6RGoHr.QI5mAZ77Uyjs3bYOjLD5VFLG";
+      passwordToSend = "123";
     } else {
       passwordToSend = password;
     }
   
     try {
-      const response = await fetch("/pruebasUser/login/email", {
+      const response = await fetch("/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -44,13 +44,14 @@ const LoginScreen = () => {
       
       console.log("📦 JSON recibido:", data);
       
-      if (!data.id_usuario || typeof data.manager === "undefined") {
+      if (!data.user.id_usuario || typeof data.user.manager === "undefined") {
         throw new Error("Datos incompletos del servidor");
       }
       
-      localStorage.setItem("userId", data.id);
-      localStorage.setItem("userData", JSON.stringify(data));
-      localStorage.setItem("isManager", data.manager);
+      localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("userData", JSON.stringify(data.user));
+      localStorage.setItem("isManager", data.user.manager);
+      localStorage.setItem("token", data.token);
       
       navigate(data.manager ? "/analytics" : "/dashdev");
   

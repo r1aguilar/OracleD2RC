@@ -36,6 +36,11 @@ public class SprintsService {
         return listaSprints;
     }
 
+    public List<Sprints> getAllSprintsForKPIsFromProject(int idProyecto){
+        List<Sprints> listaSprints = sprintsRepository.findByIdProyectoOrderByFechaInicio(idProyecto);
+        return listaSprints;
+    }
+
     public Sprints addSprints(Sprints Sprints){
         return sprintsRepository.save(Sprints);
     }

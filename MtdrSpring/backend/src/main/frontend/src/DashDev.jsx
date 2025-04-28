@@ -59,16 +59,21 @@ const DashDev = () => {
         const formattedTask = {
           id: `task-${task.idTarea}`,
           rawId: task.idTarea,
-          type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
-          title: task.nombre,
-          description: task.descripcion,
-          idColumna: task.idColumna,
           idEncargado: task.idEncargado,
           idProyecto: task.idProyecto,
+          idColumna: task.idColumna,
           idSprint: task.idSprint,
+          title: task.nombre,
+          description: task.descripcion,
           fechaInicio: task.fechaInicio,
           fechaVencimiento: task.fechaVencimiento,
-          prioridad: task.prioridad
+          fechaCompletado: task.fechaCompletado,
+          storyPoints: task.storyPoints,
+          tiempoReal: task.tiempoReal,
+          tiempoEstimado: task.tiempoEstimado,
+          prioridad: task.prioridad,
+          aceptada: 1,
+          type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
         };
   
         if (task.idColumna === 1) newTasks.pending.push(formattedTask);
@@ -133,20 +138,27 @@ const DashDev = () => {
   
     // 3. Actualización en el backend usando el endpoint correcto
     try {
-      const response = await fetch(`http://localhost:8080/pruebas/updateTarea/${movedTask.rawId}`, {
+      const response = await fetch(`/pruebas/updateTarea/${movedTask.rawId}`, {
         method: "PUT", // Usando PUT como especifica tu @PutMapping
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           idTarea: movedTask.rawId,
-          idColumna: columnMap[destinationColumn],
-          nombre: movedTask.title,
-          descripcion: movedTask.description,
-          prioridad: movedTask.prioridad === "High" ? 3 : 
-                   movedTask.prioridad === "Medium" ? 2 : 1,
           idEncargado: movedTask.idEncargado,
           idProyecto: movedTask.idProyecto,
+          idColumna: columnMap[destinationColumn],
+          idSprint: movedTask.idSprint,
+          nombre: movedTask.title,
+          descripcion: movedTask.description,
+          prioridad: movedTask.prioridad,
+          fechaInicio: movedTask.fechaInicio,
+          fechaVencimiento: movedTask.fechaVencimiento,
+          fechaCompletado: movedTask.fechaCompletado,
+          storyPoints: movedTask.storyPoints,
+          tiempoReal: movedTask.tiempoReal,
+          tiempoEstimado: movedTask.tiempoEstimado,
+          aceptada: movedTask.aceptada
           // Incluye todos los campos que tu entidad Tarea requiere
         }),
       });

@@ -87,6 +87,14 @@ public class TareaService {
         return tareasAceptadasDelSprintParaManager;
     }
 
+    public long countAllTasksFromSprint(int idSprint){
+        return tareaRepository.countByAceptadaAndIdSprint(1, idSprint);
+    }
+
+    public long countAllTasksFromSprintAndColumn(int idSprint, int idColumna){
+        return tareaRepository.countByAceptadaAndIdSprintAndIdColumna(1, idSprint, idColumna);
+    }
+
     public ResponseEntity<Tarea> getItemById(int id){
         Optional<Tarea> userByID = tareaRepository.findById(id);
         if (userByID.isPresent()){

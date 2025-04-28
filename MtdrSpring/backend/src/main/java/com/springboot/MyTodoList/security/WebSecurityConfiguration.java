@@ -22,38 +22,35 @@ public class WebSecurityConfiguration {
     private AuthenticationProvider authenticationProvider;
 
     @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .csrf().disable()
-        .authorizeHttpRequests()
-            .requestMatchers(
-                new AntPathRequestMatcher("/"),
-                new AntPathRequestMatcher("/index.html"),
-                new AntPathRequestMatcher("/manifest.json"),
-                new AntPathRequestMatcher("/favicon.ico"),
-                new AntPathRequestMatcher("/logo192.png"),
-                new AntPathRequestMatcher("/logo512.png"),
-                new AntPathRequestMatcher("/static/**"),
-                new AntPathRequestMatcher("/pruebas/**"),
-                new AntPathRequestMatcher("/pruebasUser/**"),
-                new AntPathRequestMatcher("/pruebasProy/**"),
-                new AntPathRequestMatcher("/auth/**"),
-                new AntPathRequestMatcher("/analytics"),
-                new AntPathRequestMatcher("/dashboard"),
-                new AntPathRequestMatcher("/registro"),
-                new AntPathRequestMatcher("/login"),
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf().disable()
+            .authorizeHttpRequests()
+                .requestMatchers(
+                    new AntPathRequestMatcher("/"),
+                    new AntPathRequestMatcher("/index.html"),
+                    new AntPathRequestMatcher("/manifest.json"),
+                    new AntPathRequestMatcher("/favicon.ico"),
+                    new AntPathRequestMatcher("/logo192.png"),
+                    new AntPathRequestMatcher("/logo512.png"),
+                    new AntPathRequestMatcher("/static/**"),
+                    new AntPathRequestMatcher("/pruebas/**"),
+                    new AntPathRequestMatcher("/pruebasUser/**"),
+                    new AntPathRequestMatcher("/pruebasProy/**"),
+                    new AntPathRequestMatcher("/pruebasSprint/**"),
+                    new AntPathRequestMatcher("/auth/**"),
+                    new AntPathRequestMatcher("/analytics"),
+                    new AntPathRequestMatcher("/dashboard"),
+                    new AntPathRequestMatcher("/registro"),
+                    new AntPathRequestMatcher("/login")
+                ).permitAll()
+                .anyRequest().authenticated()
+            .and()
+            .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            .and()
+            .authenticationProvider(authenticationProvider)
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-                new AntPathRequestMatcher("/**")
-
-            ).permitAll()
-            .anyRequest().authenticated()
-        .and()
-        .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-        .and()
-        .authenticationProvider(authenticationProvider)
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
-    return http.build();
-}
-
+        return http.build();
+    }
 }
