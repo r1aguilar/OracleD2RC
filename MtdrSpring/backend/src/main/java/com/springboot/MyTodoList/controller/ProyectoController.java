@@ -56,12 +56,12 @@ public class ProyectoController {
         }
     }
 
-    @GetMapping(value = "/ProyectosForManager/{id}")
+    @GetMapping(value = "/ProyectosForManager/{idUser}")
     public List<Proyecto> getProyectosForManager(@PathVariable int idUser){
         return proeyctoService.findAllProjectsForManager(idUser);
     }
 
-    @GetMapping(value = "/UsuariosProyecto/{id}")
+    @GetMapping(value = "/UsuariosProyecto/{idProy}")
     public List<Usuario> getAllUsersFromProyecto(@PathVariable int idProy){
         // Obtener el id del equipo a traves del proyecto
         Equipo equipo = equipoService.findEquipoByIdProyecto(idProy).getBody();

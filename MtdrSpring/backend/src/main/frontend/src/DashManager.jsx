@@ -147,28 +147,28 @@ const DashManager = () => {
       console.log("Fetched proyectos:", validProys);
       
       setProyectos(validProys);
-      setSelectedProyecto(data[0].id)
+      console.log(validProys[0].id)
+      setSelectedProyecto(validProys[0].id)
       
-      console.log("Initial selected proyecto IDs:", selectedProyecto);
+      console.log("Initial selected proyecto IDs:", validProys[0].id);
+
+      return validProys[0].id;
       
     } catch (err) {
       console.error("Failed to fetch proyectos", err);
     }
   }, []);
 
-  const fetchIntegrantes = useCallback(async () => {
-    if (!selectedProyecto) return;
+  const fetchIntegrantes = useCallback(async (proyectoId = selectedProyecto) => {
+    if (!proyectoId) return;
     try {
-      const res = await fetch(`/pruebasProy/UsuariosProyecto/${selectedProyecto}`);
+      const res = await fetch(`/pruebasProy/UsuariosProyecto/${proyectoId}`);
       const data = await res.json();
       
       // Ensure we get valid sprint data
       const validUsers = data.filter(user => 
         user && user.id !== undefined && user.id !== null
       );
-      
-      
-      validUsers.push({id:null,nombre:"All Users"})
       
       // Log valid sprints for debugging
       console.log("Fetched users:", validUsers);
@@ -181,11 +181,12 @@ const DashManager = () => {
     }
   }, []);
 
-  const fetchTasks = useCallback(async () => {
-    if (!selectedProyecto) return navigate("/login");
+  const fetchTasks = useCallback(async (proyectoId = selectedProyecto) => {
+    console.log("Tasks proyecto id", proyectoId);
+    if (!proyectoId) return;
 
     try {
-      const res = await fetch(`/pruebas/TareasProyecto/${selectedProyecto}`);
+      const res = await fetch(`/pruebas/TareasProyecto/${proyectoId}`);
       if (!res.ok) throw new Error("Error al cargar tareas");
 
       const data = await res.json();
@@ -230,11 +231,11 @@ const DashManager = () => {
     }
   }, [navigate]);
 
-  const fetchSprints = useCallback(async () => {
-    if (!selectedProyecto) return navigate("/login");
+  const fetchSprints = useCallback(async (proyectoId = selectedProyecto) => {
+    if (!proyectoId) return;
 
     try {
-      const res = await fetch(`/pruebasSprint/SprintsForProject/${selectedProyecto}`);
+      const res = await fetch(`/pruebasSprint/SprintsForProject/${proyectoId}`);
       const data = await res.json();
       
       // Ensure we get valid sprint data
@@ -263,84 +264,74 @@ const DashManager = () => {
   }, []);
 
   useEffect(() => {
-    fetchTasks();
-    fetchSprints();
-    fetchProyectos();
-    fetchIntegrantes();
-  }, [fetchTasks, fetchSprints, fetchProyectos, fetchIntegrantes]);
+  const init = async () => {
+    const proyectoId = await fetchProyectos();
+  };
+  init();
+}, []);
 
   useEffect(() => {
     if (selectedProyecto) {
-      fetchTasks();
-      fetchSprints();
-      fetchIntegrantes();
+      fetchTasks(selectedProyecto);
+      fetchSprints(selectedProyecto);
+      fetchIntegrantes(selectedProyecto);
     }
   }, [selectedProyecto]);
 
 
-  // Update tasks when selected sprints change
   useEffect(() => {
-    // Log for debugging
-    console.log("Selected sprints changed:", Array.from(selectedSprints));
-    console.log("All tasks:", allTasks);
-    
-    if (selectedSprints.size === 0) {
-      // If no sprints are selected, show all tasks
-      setTasks({
-        pending: [],
-        doing: [],
-        done: []
-      });
-      return;
-    }
-    
-    // Calculate how many tasks per sprint for debugging
-    const sprintTaskCounts = {};
-    Object.values(allTasks).forEach(columnTasks => {
-      columnTasks.forEach(task => {
-        if (!task.idSprint) {
-          console.warn("Task missing sprint ID:", task);
-          return;
-        }
-        
+  console.log("Selected sprints:", Array.from(selectedSprints));
+  console.log("Selected integrante:", selectedIntegrante);
+  console.log("All tasks:", allTasks);
+
+  if (selectedSprints.size === 0) {
+    setTasks({
+      pending: [],
+      doing: [],
+      done: [],
+    });
+    return;
+  }
+
+  const sprintTaskCounts = {};
+  const filtered = Object.fromEntries(
+    Object.entries(allTasks).map(([columnKey, columnTasks]) => [
+      columnKey,
+      columnTasks.filter((task) => {
         const sprintId = Number(task.idSprint);
-        if (isNaN(sprintId)) {
-          console.warn("Invalid sprint ID in task:", task);
-          return;
+        const encargadoId = task.idEncargado;
+
+        if (isNaN(sprintId) || !selectedSprints.has(sprintId)) {
+          return false;
         }
-        
-        sprintTaskCounts[sprintId] = (sprintTaskCounts[sprintId] || 0) + 1;
-      });
+
+        // If selectedIntegrante is null or empty string, show all
+        if (!selectedIntegrante || selectedIntegrante === "null") {
+          return true;
+        }
+
+        return String(encargadoId) === String(selectedIntegrante);
+      }),
+    ])
+  );
+
+  Object.values(allTasks).forEach((columnTasks) => {
+    columnTasks.forEach((task) => {
+      const sid = Number(task.idSprint);
+      if (!isNaN(sid)) {
+        sprintTaskCounts[sid] = (sprintTaskCounts[sid] || 0) + 1;
+      }
     });
-    console.log("Tasks per sprint:", sprintTaskCounts);
-    
-    // Filter tasks to only include those from selected sprints
-    const filtered = Object.fromEntries(
-      Object.entries(allTasks).map(([key, value]) => [
-        key,
-        value.filter((task) => {
-          if (!task.idSprint) return false;
-          
-          const taskSprintId = Number(task.idSprint);
-          if (isNaN(taskSprintId)) return false;
-          
-          const isIncluded = selectedSprints.has(taskSprintId);
-          return isIncluded;
-        })
-      ])
-    );
-    
-    console.log("Filtered tasks:", filtered);
-    setTasks(filtered);
-    
-    // Update debug info
-    setDebugSprintInfo({
+  });
+
+  setTasks(filtered);
+  setDebugSprintInfo({
       selectedSprints: Array.from(selectedSprints),
-      totalTasksPerSprint: sprintTaskCounts,
       filteredTaskCount: Object.values(filtered).flat().length,
-      allTasksCount: Object.values(allTasks).flat().length
+      allTasksCount: Object.values(allTasks).flat().length,
     });
-  }, [selectedSprints, allTasks]);
+  }, [selectedSprints, allTasks, selectedIntegrante]);
+
 
   // Function to handle sprint selection/deselection
   const handleSprintToggle = (sprintId, isChecked) => {
@@ -382,6 +373,11 @@ const DashManager = () => {
     return null;
   };
 
+  const progress =
+    tasks.done.length + tasks.pending.length + tasks.doing.length > 0
+      ? Math.round((tasks.done.length / (tasks.done.length + tasks.pending.length + tasks.doing.length)) * 100)
+      : 0;
+
   if (isLoading) return <div className="text-white text-center mt-10">Cargando tareas...</div>;
 
   return (
@@ -412,7 +408,7 @@ const DashManager = () => {
               value={selectedIntegrante}
               onChange={(e) => setSelectedIntegrante(e.target.value)}
             >
-              <option value="">Select a User</option>
+              <option value="">All Users</option>
               {integrantes.map((integrante) => (
                 <option key={integrante.id} value={integrante.id}>
                   {integrante.nombre} 
@@ -446,9 +442,6 @@ const DashManager = () => {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
           measuring={{
             droppable: {
               strategy: 'always'

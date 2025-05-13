@@ -54,7 +54,7 @@ const LoginScreen = () => {
       localStorage.setItem("isManager", data.user.manager);
       localStorage.setItem("token", data.token);
       
-      navigate(data.manager ? "/dashmanager" : "/dashdev");
+      navigate(data.user.manager ? "/dashmanager" : "/dashdev");
   
     } catch (error) {
       console.error("💥 Error en login:", error);

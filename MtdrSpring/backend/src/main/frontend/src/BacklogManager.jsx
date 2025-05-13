@@ -8,6 +8,12 @@ const BacklogManager = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [sprints, setSprints] = useState([]);
   const [backlog, setBacklog] = useState([]);
+  const [proyectos, setProyectos] = useState([]);
+  const [integrantes, setIntegrantes] = useState([]);
+  const [tasks, setTasks] = useState({ pending: [], doing: [], done: [] });
+  const [allTasks, setAllTasks] = useState({ pending: [], doing: [], done: [] });
+  const [selectedProyecto, setSelectedProyecto] = useState(null);
+  const [selectedIntegrante, setSelectedIntegrante] = useState(null);
 
   useEffect(() => {
     // Simulación de datos estáticos
@@ -69,19 +75,14 @@ const BacklogManager = () => {
           {sprints.map((sprint) => (
             <div key={sprint.id} className="bg-[#2a2a2a] rounded p-4">
               <div className="flex justify-between items-center mb-2">
-                <h2 className="font-bold text-lg text-white">{sprint.name}</h2>
+                <h2 className="font-bold text-lg text-white">{sprint.nombre}</h2>
                 <div className="flex gap-6 text-sm text-white">
-                  <span>Start date: {sprint.startDate}</span>
-                  <span>Completion date: {sprint.endDate}</span>
-                  <span>Status: <select defaultValue={sprint.status} className="bg-transparent border-b border-gray-500">
+                  <span>Start date: {sprint.fechaInicio}</span>
+                  <span>Completion date: {sprint.fechaFin}</span>
+                  <span>Status: <select defaultValue={sprint.completado ? "Completed" : "In Progress"} className="bg-transparent border-b border-gray-500">
                     <option>Completed</option>
                     <option>In progress</option>
                   </select></span>
-                  <span className="flex items-center gap-1">Developers:
-                    {[...Array(sprint.developers)].map((_, i) => (
-                      <span key={i} className="inline-block w-6 h-6 bg-gray-400 rounded-full ml-1"></span>
-                    ))}
-                  </span>
                 </div>
               </div>
               <div className="flex gap-3 flex-wrap">
