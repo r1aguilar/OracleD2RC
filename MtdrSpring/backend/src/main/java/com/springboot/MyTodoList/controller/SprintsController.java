@@ -15,14 +15,19 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
 import com.springboot.MyTodoList.model.Sprints;
+import com.springboot.MyTodoList.model.IntegrantesEquipo;
+
 import com.springboot.MyTodoList.service.SprintsService;
 import com.springboot.MyTodoList.service.TareaService;
-
+import com.springboot.MyTodoList.service.IntegrantesEquipoService;
+import com.springboot.MyTodoList.service.EquipoService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.springboot.MyTodoList.model.Equipo;
 
 @RestController
 @RequestMapping("/pruebasSprint")
@@ -31,11 +36,28 @@ public class SprintsController {
     private SprintsService sprintsService;
     @Autowired
     private TareaService tareaService;
+    @Autowired
+    private IntegrantesEquipoService integrantesEquipoService;
+    @Autowired
+    private EquipoService equipoService;
 
     @GetMapping(value = "/Sprints")
     public List<Sprints> getAllSprints(){
         return sprintsService.findAll();
     }
+
+    @GetMapping(value = "/SprintsForUser/{idUser}")
+    public List<Sprints> getAllSprintsForUser(@PathVariable int idUser) {
+        IntegrantesEquipo user = integrantesEquipoService.getItemByIdUsuario(idUser).getBody();
+        Equipo equipo = equipoService.getItemById(user.getIdEquipo()).getBody();
+        return sprintsService.findAllSprintsFromProject(equipo.getIdProyecto());
+    }
+
+    @GetMapping(value = "/SprintsForProject/{idProy}")
+    public List<Sprints> getAllSprintsForProject(@PathVariable int idProy) {
+        return sprintsService.findAllSprintsFromProject(idProy);
+    }
+
 
     @GetMapping(value = "/SprintsForKPIs/{idProy}")
         public List<Map<String, Object>> getAllSprintsFromProjectForKPIs(@PathVariable int idProy) {

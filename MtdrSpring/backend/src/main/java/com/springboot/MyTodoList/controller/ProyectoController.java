@@ -1,4 +1,5 @@
 package com.springboot.MyTodoList.controller;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,14 +15,31 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.springboot.MyTodoList.model.Equipo;
+import com.springboot.MyTodoList.service.EquipoService;
+
+import com.springboot.MyTodoList.model.IntegrantesEquipo;
+import com.springboot.MyTodoList.service.IntegrantesEquipoService;
+
 import com.springboot.MyTodoList.model.Proyecto;
 import com.springboot.MyTodoList.service.ProyectoService;
+
+import com.springboot.MyTodoList.model.Usuario;
+import com.springboot.MyTodoList.service.UsuarioService;
+
+
 
 @RestController
 @RequestMapping("/pruebasProy")
 public class ProyectoController {
     @Autowired
     private ProyectoService proeyctoService;
+    @Autowired
+    private UsuarioService usuarioService;
+    @Autowired
+    private EquipoService equipoService;
+    @Autowired
+    private IntegrantesEquipoService integrantesEquipoService;
 
     @GetMapping(value = "/Proyectos")
     public List<Proyecto> getAllProyectos(){
@@ -36,6 +54,27 @@ public class ProyectoController {
         }catch (Exception e){
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+    }
+
+    @GetMapping(value = "/ProyectosForManager/{id}")
+    public List<Proyecto> getProyectosForManager(@PathVariable int idUser){
+        return proeyctoService.findAllProjectsForManager(idUser);
+    }
+
+    @GetMapping(value = "/UsuariosProyecto/{id}")
+    public List<Usuario> getAllUsersFromProyecto(@PathVariable int idProy){
+        // Obtener el id del equipo a traves del proyecto
+        Equipo equipo = equipoService.findEquipoByIdProyecto(idProy).getBody();
+
+        // A traves del id del equipo obtener la lista de integrantesEquipo
+        List<IntegrantesEquipo> integrantes = integrantesEquipoService.findAllByIdEquipo(equipo.getIdEquipo());
+
+        // Con la lista de intregrantes, ahora a hacer la lista de usuarios
+        List<Usuario> usuariosDelEquipo = new ArrayList<>();
+        for(IntegrantesEquipo integrante : integrantes){
+            usuariosDelEquipo.add(usuarioService.getItemById(integrante.getIdUsuario()).getBody());
+        }
+        return usuariosDelEquipo;
     }
 
     @PostMapping(value = "/Proyectos")

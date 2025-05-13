@@ -3,10 +3,13 @@ package com.springboot.MyTodoList.security;
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +25,8 @@ import io.jsonwebtoken.security.Keys;
 public class JwtService {
 
     private static final String SECRET_KEY = "a5268647c451b4360ddfc2d798334aeda910d66bd6dadc2f268b8a5300cd8c38";
+    private static final String ROLES_KEY = "roles";
+    
     @Autowired
     private TokenRepository tokenRepository;
     
@@ -35,7 +40,11 @@ public class JwtService {
     }
 
     public String generateToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails);
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put(ROLES_KEY, userDetails.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .collect(Collectors.toList()));
+        return generateToken(extraClaims, userDetails);
     }
 
     public String generateToken(
@@ -81,5 +90,9 @@ public class JwtService {
     private Key getSignInKey(){
         byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public List<String> extractRoles(String token) {
+        return extractClaim(token, claims -> claims.get(ROLES_KEY, List.class));
     }
 }

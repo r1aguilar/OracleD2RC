@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -13,6 +14,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
 public class WebSecurityConfiguration {
 
     @Autowired
@@ -39,11 +41,13 @@ public class WebSecurityConfiguration {
                     new AntPathRequestMatcher("/pruebasProy/**"),
                     new AntPathRequestMatcher("/pruebasSprint/**"),
                     new AntPathRequestMatcher("/auth/**"),
-                    new AntPathRequestMatcher("/analytics"),
                     new AntPathRequestMatcher("/dashboard"),
                     new AntPathRequestMatcher("/registro"),
-                    new AntPathRequestMatcher("/login")
+                    new AntPathRequestMatcher("/login"),
+                    new AntPathRequestMatcher("/dashManager")
                 ).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/analytics")).hasAuthority("MANAGER")
+                .requestMatchers(new AntPathRequestMatcher("/dashdev")).hasAuthority("DEVELOPER")
                 .anyRequest().authenticated()
             .and()
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)

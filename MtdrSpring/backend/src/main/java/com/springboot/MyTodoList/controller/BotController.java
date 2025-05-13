@@ -72,6 +72,8 @@ public class BotController extends TelegramLongPollingBot {
 		this.botName = botName;
 	}
 
+	public BotController(){}
+
 	@Override
 	public void onUpdateReceived(Update update) {
 		if (update.hasMessage() && update.getMessage().hasContact()) {

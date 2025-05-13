@@ -1,9 +1,24 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
+import Dropdown from "./components/DropDown";
 import { ResponsiveContainer, RadialBarChart, RadialBar } from "recharts";
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableItem } from './components/SortableItem';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { SortableItem } from "./components/SortableItem";
 import { Bell, UserCircle, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -19,49 +34,118 @@ const columnMap = {
   done: 3,
 };
 
+const columnNames = {
+  1: "pending",
+  2: "doing",
+  3: "done",
+};
+
+// Create a separate droppable component for empty columns
+const EmptyDropArea = ({ columnId }) => {
+  const { setNodeRef, isOver } = useDroppable({
+    id: columnId
+  });
+  
+  return (
+    <div 
+      ref={setNodeRef}
+      className={`flex items-center justify-center h-32 bg-[#1a1a1a] rounded-lg border border-dashed ${isOver ? 'border-red-500 bg-[#252525]' : 'border-gray-600'}`}
+    >
+      <p className="text-gray-500">Drop tasks here</p>
+    </div>
+  );
+};
+
+const TaskList = ({ columnId, tasks }) => {
+  if (tasks.length === 0) {
+    return <EmptyDropArea columnId={columnId} />;
+  }
+
+  return (
+    <SortableContext 
+      items={tasks.map(t => t.id)}
+      strategy={verticalListSortingStrategy}
+    >
+      {tasks.map((task) => (
+        <SortableItem key={task.id} id={task.id}>
+          <div className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700">
+            <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
+              {task.type}
+            </span>
+            <h3 className="font-semibold text-white mt-2">{task.title}</h3>
+            <p className="text-sm text-gray-400">{task.description}</p>
+            <p className="text-xs text-gray-500 mt-2">
+              {new Date(task.fechaVencimiento).toLocaleDateString()}
+            </p>
+          </div>
+        </SortableItem>
+      ))}
+    </SortableContext>
+  );
+};
+
+const DroppableColumn = ({ id, title, tasksCount, children, isOver }) => {
+  return (
+    <section
+      className={`bg-[#2a2a2a] text-white rounded-lg p-4 flex flex-col ${
+        isOver ? "ring-2 ring-red-500 bg-[#3a3a3a]" : ""
+      }`}
+      data-column-id={id}
+    >
+      <h2 className="text-lg font-semibold mb-2 capitalize">
+        {title} ({tasksCount})
+      </h2>
+      <div className="flex-grow min-h-[100px] space-y-3">
+        {children}
+      </div>
+    </section>
+  );
+};
+
 const DashDev = () => {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState({ pending: [], doing: [], done: [] });
+  const [allTasks, setAllTasks] = useState({ pending: [], doing: [], done: [] });
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeId, setActiveId] = useState(null);
+  const [activeTask, setActiveTask] = useState(null);
+  const [overColumnId, setOverColumnId] = useState(null);
+  const [originalTaskLocations, setOriginalTaskLocations] = useState({});
+  const [sprints, setSprints] = useState([]);
+  const [selectedSprints, setSelectedSprints] = useState(new Set());
+  // Debug state to track what's happening with sprint selection
+  const [debugSprintInfo, setDebugSprintInfo] = useState(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+    useSensor(PointerSensor, { 
+      activationConstraint: { distance: 8 } 
+    }),
+    useSensor(KeyboardSensor, { 
+      coordinateGetter: sortableKeyboardCoordinates 
     })
   );
 
   const fetchTasks = useCallback(async () => {
-    // Obtener datos completos del usuario
     const userData = JSON.parse(localStorage.getItem("userData"));
     const userId = userData?.id;
-  
-    if (!userId) {
-      console.error("No se encontró ID de usuario");
-      navigate("/login");
-      return;
-    }
-  
+    if (!userId) return navigate("/login");
+
     try {
-      const response = await fetch(`/pruebas/TareasUsuario/${userId}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Error al cargar tareas");
-      }
-  
-      const data = await response.json();
+      const res = await fetch(`/pruebas/TareasUsuario/${userId}`);
+      if (!res.ok) throw new Error("Error al cargar tareas");
+
+      const data = await res.json();
       const newTasks = { pending: [], doing: [], done: [] };
-  
+      const newOriginalLocations = {};
+
       data.forEach((task) => {
-        const formattedTask = {
+        const taskObj = {
           id: `task-${task.idTarea}`,
           rawId: task.idTarea,
           idEncargado: task.idEncargado,
           idProyecto: task.idProyecto,
-          idColumna: task.idColumna,
+          idColumna: task.idColumna, // Backend column ID
           idSprint: task.idSprint,
           title: task.nombre,
           description: task.descripcion,
@@ -75,128 +159,377 @@ const DashDev = () => {
           aceptada: 1,
           type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
         };
-  
-        if (task.idColumna === 1) newTasks.pending.push(formattedTask);
-        else if (task.idColumna === 2) newTasks.doing.push(formattedTask);
-        else if (task.idColumna === 3) newTasks.done.push(formattedTask);
+        const column = columnNames[task.idColumna];
+        if (column) {
+          newTasks[column].push(taskObj);
+          newOriginalLocations[taskObj.id] = column;
+        }
       });
-  
+
       setTasks(newTasks);
+      setAllTasks(newTasks);  // Save full list
+      setOriginalTaskLocations(newOriginalLocations);
     } catch (err) {
-      console.error("Error cargando tareas:", err);
-      
-      // Redirigir a login si el error es 401 (No autorizado)
-      if (err.message.includes("401")) {
-        navigate("/login");
-      }
+      console.error(err);
+      navigate("/login");
     } finally {
       setIsLoading(false);
     }
   }, [navigate]);
 
+  const fetchSprints = useCallback(async () => {
+    const userId = JSON.parse(localStorage.getItem("userId"));
+    if (!userId) return;
+    try {
+      const res = await fetch(`/pruebasSprint/SprintsForUser/${userId}`);
+      const data = await res.json();
+
+      console.log("Fetched sprints:", data);
+      
+      // Ensure we get valid sprint data
+      const validSprints = data.filter(sprint => 
+        sprint && sprint.id !== undefined && sprint.id !== null
+      );
+      
+      // Log valid sprints for debugging
+      console.log("Fetched sprints:", validSprints);
+      
+      setSprints(validSprints);
+      
+      // Initialize all sprints as selected, using Number() to ensure IDs are numeric
+      const initialSelectedSprints = new Set(
+        validSprints
+          .map(sprint => Number(sprint.id))
+          .filter(id => !isNaN(id)) // Filter out any NaN values
+      );
+      
+      setSelectedSprints(initialSelectedSprints);
+      console.log("Initial selected sprint IDs:", Array.from(initialSelectedSprints));
+      
+    } catch (err) {
+      console.error("Failed to fetch sprints", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTasks();
-  }, [fetchTasks]);
+    fetchSprints();
+  }, [fetchTasks, fetchSprints]);
 
-  const handleDragStart = (event) => {
-    setActiveId(event.active.id);
-  };
-
-  const handleDragEnd = async (event) => {
-    const { active, over } = event;
-    setActiveId(null);
-  
-    if (!over || active.id === over.id) return;
-  
-    // 1. Identificar columnas involucradas
-    let sourceColumn, destinationColumn;
-    Object.entries(tasks).forEach(([column, items]) => {
-      if (items.some(item => item.id === active.id)) sourceColumn = column;
-      if (items.some(item => item.id === over.id)) destinationColumn = column;
-    });
-  
-    if (!sourceColumn || !destinationColumn) return;
-  
-    // 2. Actualización optimista en el estado local
-    const sourceItems = [...tasks[sourceColumn]];
-    const taskIndex = sourceItems.findIndex(item => item.id === active.id);
-    const [movedTask] = sourceItems.splice(taskIndex, 1);
+  // Update tasks when selected sprints change
+  useEffect(() => {
+    // Log for debugging
+    console.log("Selected sprints changed:", Array.from(selectedSprints));
+    console.log("All tasks:", allTasks);
     
-    const updatedTask = { 
-      ...movedTask, 
-      idColumna: columnMap[destinationColumn] 
-    };
-  
-    const destItems = [...tasks[destinationColumn]];
-    destItems.splice(destItems.findIndex(item => item.id === over.id), 0, updatedTask);
-  
-    setTasks({
-      ...tasks,
-      [sourceColumn]: sourceItems,
-      [destinationColumn]: destItems
-    });
-  
-    // 3. Actualización en el backend usando el endpoint correcto
-    try {
-      const response = await fetch(`/pruebas/updateTarea/${movedTask.rawId}`, {
-        method: "PUT", // Usando PUT como especifica tu @PutMapping
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          idTarea: movedTask.rawId,
-          idEncargado: movedTask.idEncargado,
-          idProyecto: movedTask.idProyecto,
-          idColumna: columnMap[destinationColumn],
-          idSprint: movedTask.idSprint,
-          nombre: movedTask.title,
-          descripcion: movedTask.description,
-          prioridad: movedTask.prioridad,
-          fechaInicio: movedTask.fechaInicio,
-          fechaVencimiento: movedTask.fechaVencimiento,
-          fechaCompletado: movedTask.fechaCompletado,
-          storyPoints: movedTask.storyPoints,
-          tiempoReal: movedTask.tiempoReal,
-          tiempoEstimado: movedTask.tiempoEstimado,
-          aceptada: movedTask.aceptada
-          // Incluye todos los campos que tu entidad Tarea requiere
-        }),
+    if (selectedSprints.size === 0) {
+      // If no sprints are selected, show all tasks
+      setTasks({
+        pending: [],
+        doing: [],
+        done: []
       });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Error al actualizar tarea");
-      }
-  
-      const updatedData = await response.json();
-      console.log("✅ Tarea actualizada:", updatedData);
-    } catch (error) {
-      console.error("❌ Error al actualizar tarea:", error.message);
-      // Revertir cambios si falla
-      setTasks(prevTasks => ({
-        ...prevTasks,
-        [sourceColumn]: [...prevTasks[sourceColumn], movedTask],
-        [destinationColumn]: prevTasks[destinationColumn].filter(t => t.id !== movedTask.id)
-      }));
+      return;
     }
+    
+    // Calculate how many tasks per sprint for debugging
+    const sprintTaskCounts = {};
+    Object.values(allTasks).forEach(columnTasks => {
+      columnTasks.forEach(task => {
+        if (!task.idSprint) {
+          console.warn("Task missing sprint ID:", task);
+          return;
+        }
+        
+        const sprintId = Number(task.idSprint);
+        if (isNaN(sprintId)) {
+          console.warn("Invalid sprint ID in task:", task);
+          return;
+        }
+        
+        sprintTaskCounts[sprintId] = (sprintTaskCounts[sprintId] || 0) + 1;
+      });
+    });
+    console.log("Tasks per sprint:", sprintTaskCounts);
+    
+    // Filter tasks to only include those from selected sprints
+    const filtered = Object.fromEntries(
+      Object.entries(allTasks).map(([key, value]) => [
+        key,
+        value.filter((task) => {
+          if (!task.idSprint) return false;
+          
+          const taskSprintId = Number(task.idSprint);
+          if (isNaN(taskSprintId)) return false;
+          
+          const isIncluded = selectedSprints.has(taskSprintId);
+          return isIncluded;
+        })
+      ])
+    );
+    
+    console.log("Filtered tasks:", filtered);
+    setTasks(filtered);
+    
+    // Update debug info
+    setDebugSprintInfo({
+      selectedSprints: Array.from(selectedSprints),
+      totalTasksPerSprint: sprintTaskCounts,
+      filteredTaskCount: Object.values(filtered).flat().length,
+      allTasksCount: Object.values(allTasks).flat().length
+    });
+  }, [selectedSprints, allTasks]);
+
+  // Function to handle sprint selection/deselection
+  const handleSprintToggle = (sprintId, isChecked) => {
+    // Ensure sprintId is a number
+    const numericSprintId = Number(sprintId);
+    
+    // Check if it's a valid number
+    if (isNaN(numericSprintId)) {
+      console.error("Invalid sprint ID received:", sprintId);
+      return;
+    }
+    
+    console.log(`Toggle sprint ${numericSprintId} to ${isChecked}`);
+    
+    setSelectedSprints(prev => {
+      const newSet = new Set(prev);
+      if (isChecked) {
+        newSet.add(numericSprintId);
+      } else {
+        newSet.delete(numericSprintId);
+      }
+      console.log("New selected sprints:", Array.from(newSet));
+      return newSet;
+    });
   };
 
-  const totalTasks = tasks.pending.length + tasks.doing.length + tasks.done.length;
-  const progress = totalTasks > 0 ? Math.round((tasks.done.length / totalTasks) * 100) : 0;
+  // Completely avoiding the use of findColumn() during drag end since it's causing issues
+  const findColumn = (itemId) => {
+    if (itemId === "pending" || itemId === "doing" || itemId === "done") {
+      return itemId;
+    }
+    
+    for (const colId of ["pending", "doing", "done"]) {
+      if (tasks[colId].some(task => task.id === itemId)) {
+        return colId;
+      }
+    }
+    
+    return null;
+  };
 
-  if (isLoading) {
-    return <div className="text-white text-center mt-10">Cargando tareas...</div>;
-  }
+  const handleDragStart = ({ active }) => {
+    if (!active) return;
+    
+    const column = findColumn(active.id);
+    if (!column) return;
+    
+    const task = tasks[column].find((t) => t.id === active.id);
+    setActiveId(active.id);
+    setActiveTask(task || null);
+    
+    // Update the original task locations map when a drag starts
+    setOriginalTaskLocations(prev => {
+      const updated = {...prev};
+      updated[active.id] = column; // Store the current column for this task
+      return updated;
+    });
+  };
+
+  const handleDragOver = ({ active, over }) => {
+    if (!active || !over) {
+      setOverColumnId(null);
+      return;
+    }
+    
+    const activeId = active.id;
+    const overId = over.id;
+    
+    // Handle case when dragging over a column directly
+    const overColumn = ["pending", "doing", "done"].includes(overId) 
+      ? overId 
+      : findColumn(overId);
+    
+    setOverColumnId(overColumn);
+    
+    const activeColumn = findColumn(activeId);
+    
+    if (!activeColumn || !overColumn || activeColumn === overColumn) {
+      return;
+    }
+    
+    // For preview only, don't update idColumna here
+    setTasks(prevTasks => {
+      const activeItems = [...prevTasks[activeColumn]];
+      const overItems = [...prevTasks[overColumn]];
+      
+      const activeIndex = activeItems.findIndex(item => item.id === activeId);
+      if (activeIndex === -1) return prevTasks;
+      
+      // Don't modify the task's idColumna during drag preview
+      const taskToMove = { ...activeItems[activeIndex] };
+      
+      const newActiveItems = activeItems.filter(item => item.id !== activeId);
+      const newOverItems = [...overItems, taskToMove];
+      
+      return {
+        ...prevTasks,
+        [activeColumn]: newActiveItems,
+        [overColumn]: newOverItems
+      };
+    });
+  };
+
+  const handleDragEnd = async ({ active, over }) => {
+    setOverColumnId(null);
+
+    if (!active || !over) {
+      setActiveId(null);
+      setActiveTask(null);
+      return;
+    }
+
+    const activeId = active.id;
+    const overId = over.id;
+
+    const sourceColumn = originalTaskLocations[activeId];
+    let targetColumn = null;
+
+    // Determine target column
+    if (["pending", "doing", "done"].includes(overId)) {
+      targetColumn = overId;
+    } else {
+      for (const col of ["pending", "doing", "done"]) {
+        if (tasks[col].some(task => task.id === overId)) {
+          targetColumn = col;
+          break;
+        }
+      }
+    }
+
+    if (!sourceColumn || !targetColumn) {
+      console.error("Source or target column not found");
+      setActiveId(null);
+      setActiveTask(null);
+      return;
+    }
+
+    // ✅ Retrieve originalTask directly from saved original location
+    const originalTask =
+      tasks[sourceColumn]?.find(task => task.id === activeId) || activeTask;
+
+    if (!originalTask) {
+      console.error("Original task not found:", activeId);
+      setActiveId(null);
+      setActiveTask(null);
+      return;
+    }
+
+    if (sourceColumn === targetColumn) {
+      if (overId !== targetColumn) {
+        const activeIndex = tasks[sourceColumn].findIndex(task => task.id === activeId);
+        const overIndex = tasks[targetColumn].findIndex(task => task.id === overId);
+        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+          setTasks(prev => ({
+            ...prev,
+            [sourceColumn]: arrayMove(prev[sourceColumn], activeIndex, overIndex),
+          }));
+        }
+      }
+    } else {
+      const targetColumnId = columnMap[targetColumn];
+
+      setTasks(prev => {
+        const updatedSource = prev[sourceColumn].filter(task => task.id !== activeId);
+      
+        // ❗ Avoid duplicates: only add if it's not already in target column
+        const alreadyInTarget = prev[targetColumn].some(task => task.id === activeId);
+        const updatedTarget = alreadyInTarget
+          ? prev[targetColumn]
+          : [...prev[targetColumn], { ...originalTask, idColumna: targetColumnId }];
+      
+        return {
+          ...prev,
+          [sourceColumn]: updatedSource,
+          [targetColumn]: updatedTarget,
+        };
+      });
+      
+      // Also update the allTasks state to ensure filtered views remain consistent
+      setAllTasks(prev => {
+        const updatedSource = prev[sourceColumn].filter(task => task.id !== activeId);
+        
+        const alreadyInTarget = prev[targetColumn].some(task => task.id === activeId);
+        const updatedTarget = alreadyInTarget
+          ? prev[targetColumn]
+          : [...prev[targetColumn], { ...originalTask, idColumna: targetColumnId }];
+        
+        return {
+          ...prev,
+          [sourceColumn]: updatedSource,
+          [targetColumn]: updatedTarget,
+        };
+      });
+
+      setOriginalTaskLocations(prev => ({
+        ...prev,
+        [activeId]: targetColumn,
+      }));
+
+      console.log("Original task id ", originalTask);
+
+      // Always call backend API when changing columns
+      try {
+        const response = await fetch(`/pruebas/updateTarea/${originalTask.rawId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            idTarea: originalTask.rawId,
+            idEncargado: originalTask.idEncargado,
+            idProyecto: originalTask.idProyecto,
+            idColumna: targetColumnId,
+            idSprint: originalTask.idSprint,
+            nombre: originalTask.title,
+            descripcion: originalTask.description,
+            prioridad: originalTask.prioridad,
+            fechaInicio: originalTask.fechaInicio,
+            fechaVencimiento: originalTask.fechaVencimiento,
+            fechaCompletado: originalTask.fechaCompletado,
+            storyPoints: originalTask.storyPoints,
+            tiempoReal: originalTask.tiempoReal,
+            tiempoEstimado: originalTask.tiempoEstimado,
+            aceptada: originalTask.aceptada,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+        console.log("Task updated successfully in backend");
+      } catch (error) {
+        console.error("Failed to update task:", error);
+        fetchTasks(); // Rollback changes on error
+      }
+    }
+
+    setActiveId(null);
+    setActiveTask(null);
+  };
+
+  const progress =
+    tasks.done.length + tasks.pending.length + tasks.doing.length > 0
+      ? Math.round((tasks.done.length / (tasks.done.length + tasks.pending.length + tasks.doing.length)) * 100)
+      : 0;
+
+  if (isLoading) return <div className="text-white text-center mt-10">Cargando tareas...</div>;
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-[#1a1a1a]">
-      <button
-        className="md:hidden fixed top-4 left-4 z-50 text-white"
-        onClick={() => setIsMobileOpen(true)}
-      >
+      <button className="md:hidden fixed top-4 left-4 z-50 text-white" onClick={() => setIsMobileOpen(true)}>
         <Menu size={28} />
       </button>
-
       <Sidebar isMobileOpen={isMobileOpen} closeMobile={() => setIsMobileOpen(false)} />
 
       <div className="flex-1 px-4 md:px-6 lg:px-8 overflow-y-auto">
@@ -209,12 +542,23 @@ const DashDev = () => {
             <select className="bg-[#2a2a2a] text-white rounded px-4 py-2 text-sm">
               <option>All Users</option>
             </select>
-            <select className="bg-[#2a2a2a] text-white rounded px-4 py-2 text-sm">
-              <option>Sprints</option>
-              <option>Sprint 1</option>
-              <option>Sprint 2</option>
-              <option>Sprint 3</option>
-            </select>
+            <Dropdown
+              label="Sprints"
+              options={sprints.map((sprint) => ({ 
+                id: Number(sprint.id), // Ensure numeric IDs
+                name: sprint.nombre || `Sprint ${sprint.id}` // Fallback name if none exists
+              }))}
+              onSelect={handleSprintToggle}
+              initialChecked={true}
+            />
+            
+            {/* Debug info - remove in production */}
+            {debugSprintInfo && (
+              <div className="fixed bottom-4 right-4 bg-black/80 text-white p-2 rounded text-xs max-w-xs z-50">
+                <div>Selected: {debugSprintInfo.selectedSprints.join(', ')}</div>
+                <div>Filtered/Total: {debugSprintInfo.filteredTaskCount}/{debugSprintInfo.allTasksCount}</div>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <Bell className="text-white cursor-pointer hover:text-red-500" />
               <UserCircle className="text-white w-8 h-8 cursor-pointer hover:text-red-500" />
@@ -226,66 +570,39 @@ const DashDev = () => {
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          measuring={{
+            droppable: {
+              strategy: 'always'
+            }
+          }}
         >
           <main className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {Object.entries(tasks).map(([columnId, columnTasks]) => (
-              <section
+              <DroppableColumn
                 key={columnId}
-                className="bg-[#2a2a2a] text-white rounded-lg p-4 flex flex-col"
+                id={columnId}
+                title={columnId}
+                tasksCount={columnTasks.length}
+                isOver={overColumnId === columnId}
               >
-                <h2 className="text-lg font-semibold mb-2 capitalize">
-                  {columnId} ({columnTasks.length})
-                </h2>
-                <SortableContext
-                  items={columnTasks}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-3 flex-1 min-h-[100px]">
-                    {columnTasks.map((task) => (
-                      <SortableItem key={task.id} id={task.id}>
-                        <div className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700">
-                          <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
-                            {task.type}
-                          </span>
-                          <h3 className="font-semibold text-white mt-2">
-                            {task.title}
-                          </h3>
-                          <p className="text-sm text-gray-400">
-                            {task.description}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            {new Date(task.fechaVencimiento).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </SortableItem>
-                    ))}
-                  </div>
-                </SortableContext>
-              </section>
+                <TaskList
+                  columnId={columnId}
+                  tasks={columnTasks}
+                />
+              </DroppableColumn>
             ))}
 
             <section className="bg-[#2a2a2a] text-white rounded-lg p-4">
               <h2 className="text-lg font-semibold mb-2">Progress</h2>
               <div className="w-full flex items-center justify-center mb-4 relative">
                 <ResponsiveContainer width="100%" height={120}>
-                  <RadialBarChart
-                    innerRadius="70%"
-                    outerRadius="100%"
-                    barSize={10}
-                    data={[{ name: "Progress", value: progress, fill: "#ff1f1f" }]}
-                  >
-                    <RadialBar
-                      minAngle={15}
-                      background
-                      clockWise
-                      dataKey="value"
-                    />
+                  <RadialBarChart innerRadius="70%" outerRadius="100%" barSize={10} data={[{ value: progress, fill: "#ff1f1f" }]}>
+                    <RadialBar minAngle={15} background clockWise dataKey="value" />
                   </RadialBarChart>
                 </ResponsiveContainer>
-                <span className="absolute text-xl font-bold text-white">
-                  {progress}%
-                </span>
+                <span className="absolute text-xl font-bold text-white">{progress}%</span>
               </div>
               <div>
                 <h3 className="font-semibold mb-2">Tasks Left</h3>
@@ -297,6 +614,21 @@ const DashDev = () => {
               </div>
             </section>
           </main>
+
+          <DragOverlay>
+            {activeId && activeTask && (
+              <div className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 opacity-80">
+                <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[activeTask.type]}`}>
+                  {activeTask.type}
+                </span>
+                <h3 className="font-semibold text-white mt-2">{activeTask.title}</h3>
+                <p className="text-sm text-gray-400">{activeTask.description}</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  {new Date(activeTask.fechaVencimiento).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </DragOverlay>
         </DndContext>
       </div>
     </div>
