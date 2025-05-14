@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @Data
 @Builder
 @AllArgsConstructor
-@NoArgsConstructor
+//@NoArgsConstructor
 @Entity
 @Table(name = "TOKENS")
 public class Token {
@@ -26,6 +26,9 @@ public class Token {
     public Token(Integer id){
         this.id_usuario = id;
         this.token = null;
+    }
+
+        public Token(){
     }
 
     public void setToken(String token){

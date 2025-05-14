@@ -382,6 +382,11 @@ const DashManager = () => {
     return null;
   };
 
+  const progress =
+  tasks.done.length + tasks.pending.length + tasks.doing.length > 0
+    ? Math.round((tasks.done.length / (tasks.done.length + tasks.pending.length + tasks.doing.length)) * 100)
+    : 0;
+
   if (isLoading) return <div className="text-white text-center mt-10">Cargando tareas...</div>;
 
   return (
@@ -446,9 +451,6 @@ const DashManager = () => {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
           measuring={{
             droppable: {
               strategy: 'always'

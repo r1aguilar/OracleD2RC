@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import Dropdown from "./components/DropDown";
+import TaskDetailsModal from "./components/TaskDetailsModal";
 import { ResponsiveContainer, RadialBarChart, RadialBar } from "recharts";
 import {
   DndContext,
@@ -56,7 +57,7 @@ const EmptyDropArea = ({ columnId }) => {
   );
 };
 
-const TaskList = ({ columnId, tasks }) => {
+const TaskList = ({ columnId, tasks, onTaskClick }) => {
   if (tasks.length === 0) {
     return <EmptyDropArea columnId={columnId} />;
   }
@@ -68,7 +69,10 @@ const TaskList = ({ columnId, tasks }) => {
     >
       {tasks.map((task) => (
         <SortableItem key={task.id} id={task.id}>
-          <div className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700">
+          <div 
+            className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 cursor-pointer hover:border-red-500 transition-colors"
+            onClick={() => onTaskClick(task)}
+          >
             <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
               {task.type}
             </span>
@@ -114,8 +118,9 @@ const DashDev = () => {
   const [originalTaskLocations, setOriginalTaskLocations] = useState({});
   const [sprints, setSprints] = useState([]);
   const [selectedSprints, setSelectedSprints] = useState(new Set());
-  // Debug state to track what's happening with sprint selection
   const [debugSprintInfo, setDebugSprintInfo] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { 
@@ -145,7 +150,7 @@ const DashDev = () => {
           rawId: task.idTarea,
           idEncargado: task.idEncargado,
           idProyecto: task.idProyecto,
-          idColumna: task.idColumna, // Backend column ID
+          idColumna: task.idColumna,
           idSprint: task.idSprint,
           title: task.nombre,
           description: task.descripcion,
@@ -167,7 +172,7 @@ const DashDev = () => {
       });
 
       setTasks(newTasks);
-      setAllTasks(newTasks);  // Save full list
+      setAllTasks(newTasks);
       setOriginalTaskLocations(newOriginalLocations);
     } catch (err) {
       console.error(err);
@@ -186,21 +191,18 @@ const DashDev = () => {
 
       console.log("Fetched sprints:", data);
       
-      // Ensure we get valid sprint data
       const validSprints = data.filter(sprint => 
         sprint && sprint.id !== undefined && sprint.id !== null
       );
       
-      // Log valid sprints for debugging
       console.log("Fetched sprints:", validSprints);
       
       setSprints(validSprints);
       
-      // Initialize all sprints as selected, using Number() to ensure IDs are numeric
       const initialSelectedSprints = new Set(
         validSprints
           .map(sprint => Number(sprint.id))
-          .filter(id => !isNaN(id)) // Filter out any NaN values
+          .filter(id => !isNaN(id))
       );
       
       setSelectedSprints(initialSelectedSprints);
@@ -216,14 +218,11 @@ const DashDev = () => {
     fetchSprints();
   }, [fetchTasks, fetchSprints]);
 
-  // Update tasks when selected sprints change
   useEffect(() => {
-    // Log for debugging
     console.log("Selected sprints changed:", Array.from(selectedSprints));
     console.log("All tasks:", allTasks);
     
     if (selectedSprints.size === 0) {
-      // If no sprints are selected, show all tasks
       setTasks({
         pending: [],
         doing: [],
@@ -232,7 +231,6 @@ const DashDev = () => {
       return;
     }
     
-    // Calculate how many tasks per sprint for debugging
     const sprintTaskCounts = {};
     Object.values(allTasks).forEach(columnTasks => {
       columnTasks.forEach(task => {
@@ -252,7 +250,6 @@ const DashDev = () => {
     });
     console.log("Tasks per sprint:", sprintTaskCounts);
     
-    // Filter tasks to only include those from selected sprints
     const filtered = Object.fromEntries(
       Object.entries(allTasks).map(([key, value]) => [
         key,
@@ -271,7 +268,6 @@ const DashDev = () => {
     console.log("Filtered tasks:", filtered);
     setTasks(filtered);
     
-    // Update debug info
     setDebugSprintInfo({
       selectedSprints: Array.from(selectedSprints),
       totalTasksPerSprint: sprintTaskCounts,
@@ -280,12 +276,9 @@ const DashDev = () => {
     });
   }, [selectedSprints, allTasks]);
 
-  // Function to handle sprint selection/deselection
   const handleSprintToggle = (sprintId, isChecked) => {
-    // Ensure sprintId is a number
     const numericSprintId = Number(sprintId);
     
-    // Check if it's a valid number
     if (isNaN(numericSprintId)) {
       console.error("Invalid sprint ID received:", sprintId);
       return;
@@ -305,7 +298,6 @@ const DashDev = () => {
     });
   };
 
-  // Completely avoiding the use of findColumn() during drag end since it's causing issues
   const findColumn = (itemId) => {
     if (itemId === "pending" || itemId === "doing" || itemId === "done") {
       return itemId;
@@ -320,6 +312,63 @@ const DashDev = () => {
     return null;
   };
 
+  const handleTaskClick = (task) => {
+    setSelectedTask(task);
+    setShowTaskModal(true);
+  };
+
+  const handleSaveTask = async (updatedTask) => {
+    try {
+      const response = await fetch(`/pruebas/updateTarea/${updatedTask.rawId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idTarea: updatedTask.rawId,
+          idEncargado: updatedTask.idEncargado,
+          idProyecto: updatedTask.idProyecto,
+          idColumna: updatedTask.idColumna,
+          idSprint: updatedTask.idSprint,
+          nombre: updatedTask.title,
+          descripcion: updatedTask.description,
+          prioridad: updatedTask.prioridad,
+          fechaInicio: updatedTask.fechaInicio,
+          fechaVencimiento: updatedTask.fechaVencimiento,
+          fechaCompletado: updatedTask.fechaCompletado,
+          storyPoints: updatedTask.storyPoints,
+          tiempoReal: updatedTask.tiempoReal,
+          tiempoEstimado: updatedTask.tiempoEstimado,
+          aceptada: updatedTask.aceptada,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Error al actualizar la tarea");
+
+      setTasks(prev => {
+        const newTasks = { ...prev };
+        Object.keys(newTasks).forEach(col => {
+          newTasks[col] = newTasks[col].map(t => 
+            t.id === updatedTask.id ? updatedTask : t
+          );
+        });
+        return newTasks;
+      });
+
+      setAllTasks(prev => {
+        const newAllTasks = { ...prev };
+        Object.keys(newAllTasks).forEach(col => {
+          newAllTasks[col] = newAllTasks[col].map(t => 
+            t.id === updatedTask.id ? updatedTask : t
+          );
+        });
+        return newAllTasks;
+      });
+
+    } catch (error) {
+      console.error("Error saving task:", error);
+      throw error;
+    }
+  };
+
   const handleDragStart = ({ active }) => {
     if (!active) return;
     
@@ -330,10 +379,9 @@ const DashDev = () => {
     setActiveId(active.id);
     setActiveTask(task || null);
     
-    // Update the original task locations map when a drag starts
     setOriginalTaskLocations(prev => {
       const updated = {...prev};
-      updated[active.id] = column; // Store the current column for this task
+      updated[active.id] = column;
       return updated;
     });
   };
@@ -347,7 +395,6 @@ const DashDev = () => {
     const activeId = active.id;
     const overId = over.id;
     
-    // Handle case when dragging over a column directly
     const overColumn = ["pending", "doing", "done"].includes(overId) 
       ? overId 
       : findColumn(overId);
@@ -360,7 +407,6 @@ const DashDev = () => {
       return;
     }
     
-    // For preview only, don't update idColumna here
     setTasks(prevTasks => {
       const activeItems = [...prevTasks[activeColumn]];
       const overItems = [...prevTasks[overColumn]];
@@ -368,7 +414,6 @@ const DashDev = () => {
       const activeIndex = activeItems.findIndex(item => item.id === activeId);
       if (activeIndex === -1) return prevTasks;
       
-      // Don't modify the task's idColumna during drag preview
       const taskToMove = { ...activeItems[activeIndex] };
       
       const newActiveItems = activeItems.filter(item => item.id !== activeId);
@@ -397,7 +442,6 @@ const DashDev = () => {
     const sourceColumn = originalTaskLocations[activeId];
     let targetColumn = null;
 
-    // Determine target column
     if (["pending", "doing", "done"].includes(overId)) {
       targetColumn = overId;
     } else {
@@ -416,7 +460,6 @@ const DashDev = () => {
       return;
     }
 
-    // ✅ Retrieve originalTask directly from saved original location
     const originalTask =
       tasks[sourceColumn]?.find(task => task.id === activeId) || activeTask;
 
@@ -444,7 +487,6 @@ const DashDev = () => {
       setTasks(prev => {
         const updatedSource = prev[sourceColumn].filter(task => task.id !== activeId);
       
-        // ❗ Avoid duplicates: only add if it's not already in target column
         const alreadyInTarget = prev[targetColumn].some(task => task.id === activeId);
         const updatedTarget = alreadyInTarget
           ? prev[targetColumn]
@@ -457,7 +499,6 @@ const DashDev = () => {
         };
       });
       
-      // Also update the allTasks state to ensure filtered views remain consistent
       setAllTasks(prev => {
         const updatedSource = prev[sourceColumn].filter(task => task.id !== activeId);
         
@@ -478,9 +519,6 @@ const DashDev = () => {
         [activeId]: targetColumn,
       }));
 
-      console.log("Original task id ", originalTask);
-
-      // Always call backend API when changing columns
       try {
         const response = await fetch(`/pruebas/updateTarea/${originalTask.rawId}`, {
           method: "PUT",
@@ -510,7 +548,7 @@ const DashDev = () => {
         console.log("Task updated successfully in backend");
       } catch (error) {
         console.error("Failed to update task:", error);
-        fetchTasks(); // Rollback changes on error
+        fetchTasks();
       }
     }
 
@@ -545,14 +583,13 @@ const DashDev = () => {
             <Dropdown
               label="Sprints"
               options={sprints.map((sprint) => ({ 
-                id: Number(sprint.id), // Ensure numeric IDs
-                name: sprint.nombre || `Sprint ${sprint.id}` // Fallback name if none exists
+                id: Number(sprint.id),
+                name: sprint.nombre || `Sprint ${sprint.id}`
               }))}
               onSelect={handleSprintToggle}
               initialChecked={true}
             />
             
-            {/* Debug info - remove in production */}
             {debugSprintInfo && (
               <div className="fixed bottom-4 right-4 bg-black/80 text-white p-2 rounded text-xs max-w-xs z-50">
                 <div>Selected: {debugSprintInfo.selectedSprints.join(', ')}</div>
@@ -590,6 +627,7 @@ const DashDev = () => {
                 <TaskList
                   columnId={columnId}
                   tasks={columnTasks}
+                  onTaskClick={handleTaskClick}
                 />
               </DroppableColumn>
             ))}
@@ -631,6 +669,14 @@ const DashDev = () => {
           </DragOverlay>
         </DndContext>
       </div>
+
+      {showTaskModal && (
+        <TaskDetailsModal
+          task={selectedTask}
+          onClose={() => setShowTaskModal(false)}
+          onSave={handleSaveTask}
+        />
+      )}
     </div>
   );
 };
