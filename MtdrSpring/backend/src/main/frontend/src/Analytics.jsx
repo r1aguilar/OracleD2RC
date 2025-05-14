@@ -11,6 +11,8 @@ const AnalyticsManager = () => {
   const [allTasks, setAllTasks] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [userTasks, setUserTasks] = useState([]);
+  const [totalHoursBySprint, setTotalHoursBySprint] = useState([]);
+
 
 
 
@@ -93,6 +95,8 @@ useEffect(() => {
     try {
       const userIds = [1, 2, 3, 4];
       const allTasks = [];
+      const hoursPerSprintMap = {};
+
 
       for (const id of userIds) {
         const res = await fetch(`http://localhost:8080/pruebas/TareasUsuario/${id}`);
@@ -109,6 +113,22 @@ useEffect(() => {
 
 
         allTasks.push(...formatted);
+        data.forEach((t) => {
+          const sprintName = `Sprint${t.idSprint}`;
+          hoursPerSprintMap[sprintName] = (hoursPerSprintMap[sprintName] || 0) + (t.tiempoReal || 0);
+        });
+
+        const chartData = Object.entries(hoursPerSprintMap)
+          .map(([sprint, hours]) => ({ sprint, hours }))
+          .sort((a, b) => {
+            const numA = parseInt(a.sprint.replace("Sprint", ""));
+            const numB = parseInt(b.sprint.replace("Sprint", ""));
+            return numA - numB;
+          });
+
+        setTotalHoursBySprint(chartData);
+
+
       }
 
       setUserTasks(allTasks);
@@ -312,244 +332,245 @@ const completedSprintTable = uniqueSprints.map(sprint => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          <div className="bg-[#2a2a2a] rounded p-4">
-            <h3 className="text-lg font-semibold mb-4">Sprint Summary</h3>
-            <table className="w-full text-sm">
-              <thead className="text-gray-400">
-                <tr>
-                  <th className="text-left py-1">Name</th>
-                  <th className="text-left py-1">Due date</th>
-                  <th className="text-left py-1">Status</th>
-                  <th className="text-left py-1">Progress</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sprints.map((sprint, i) => (
-                  <tr key={i} className="border-t border-neutral-700">
-                    <td className="py-2">{sprint.name}</td>
-                    <td className="py-2">{sprint.date}</td>
-                    <td className="py-2 text-sm font-semibold">
-                      <span className={
-                        sprint.status === "Completed" ? "text-green-400" :
-                        sprint.status === "Doing" ? "text-yellow-400" : "text-transparent"
-                      }>
-                        {sprint.status}
-                      </span>
-                    </td>
-                    <td className="py-2">
-                      <div className="bg-neutral-800 w-full h-2 rounded-full">
-                        <div
-                          className="bg-red-500 h-2 rounded-full"
-                          style={{ width: `${sprint.progress}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-xs text-gray-400 ml-1">{sprint.progress}%</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="bg-[#2a2a2a] rounded p-4">
-            <h3 className="text-lg font-semibold mb-4">Sprint's Tasks</h3>
-            <div className="flex gap-4 mb-4 text-sm text-gray-400">
-              {['ALL', 'Completed', 'Doing', 'Pending'].map(filter => (
+        {/* BLOQUE DE RESUMEN Y TAREAS - PRIMERA FILA */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+  {/* Sprint Summary */}
+  <div className="bg-[#2a2a2a] rounded p-4">
+    <h3 className="text-lg font-semibold mb-4">Sprint Summary</h3>
+    <table className="w-full text-sm">
+      <thead className="text-gray-400">
+        <tr>
+          <th className="text-left py-1">Name</th>
+          <th className="text-left py-1">Due date</th>
+          <th className="text-left py-1">Status</th>
+          <th className="text-left py-1">Progress</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sprints.map((sprint, i) => (
+          <tr key={i} className="border-t border-neutral-700">
+            <td className="py-2">{sprint.name}</td>
+            <td className="py-2">{sprint.date}</td>
+            <td className="py-2 text-sm font-semibold">
+              <span className={
+                sprint.status === "Completed" ? "text-green-400" :
+                sprint.status === "Doing" ? "text-yellow-400" : "text-transparent"
+              }>
+                {sprint.status}
+              </span>
+            </td>
+            <td className="py-2">
+              <div className="bg-neutral-800 w-full h-2 rounded-full">
+                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${sprint.progress}%` }}></div>
+              </div>
+              <span className="text-xs text-gray-400 ml-1">{sprint.progress}%</span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  {/* Sprint's Tasks */}
+  <div className="bg-[#2a2a2a] rounded p-4">
+    <h3 className="text-lg font-semibold mb-4">Sprint's Tasks</h3>
+    <div className="flex gap-4 mb-4 text-sm text-gray-400">
+      {['ALL', 'Completed', 'Doing', 'Pending'].map(filter => (
+        <span
+          key={filter}
+          className={`cursor-pointer ${selectedFilter === filter ? 'text-white font-semibold underline' : ''}`}
+          onClick={() => setSelectedFilter(filter)}
+        >
+          {filter} {sprintTasks.filter(t =>
+            filter === "ALL" ? true :
+            filter === "Completed" ? t.status === "Done" :
+            filter === "Doing" ? t.status === "Doing" :
+            t.status === "Pending"
+          ).length}
+        </span>
+      ))}
+    </div>
+
+    <div className="h-72 overflow-y-auto">
+      <table className="w-full text-sm">
+        <thead className="text-gray-400">
+          <tr>
+            <th className="text-left py-1">Task</th>
+            <th className="text-left py-1">Estimated hours</th>
+            <th className="text-left py-1">Real hours</th>
+            <th className="text-left py-1">State</th>
+            <th className="text-left py-1">Developer</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredTasks.map((task, i) => (
+            <tr key={i} className="border-t border-neutral-700">
+              <td className="py-2">{task.name}</td>
+              <td className="py-2">{task.estimatedhours}</td>
+              <td className="py-2">{task.realhours}</td>
+              <td className="py-2">
                 <span
-                  key={filter}
-                  className={`cursor-pointer ${selectedFilter === filter ? 'text-white font-semibold underline' : ''}`}
-                  onClick={() => setSelectedFilter(filter)}
+                  className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                    task.status === "Done"
+                      ? "bg-green-500 text-white"
+                      : task.status === "Pending"
+                      ? "bg-red-500 text-white"
+                      : "bg-yellow-400 text-black"
+                  }`}
                 >
-                  {filter === 'ALL' ? 'ALL ' + sprintTasks.length :
-                  filter === 'Completed' ? 'Completed ' + sprintTasks.filter(t => t.status === 'Done').length :
-                  filter === 'Pending' ? 'Pending ' + sprintTasks.filter(t => t.status === 'Pending').length :
-                  'Doing ' + sprintTasks.filter(t => t.status === 'Doing').length}
-
+                  {task.status}
                 </span>
-              ))}
-            </div>
-
-            <div className="h-72 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="text-gray-400">
-                  <tr>
-                    <th className="text-left py-1">Task</th>
-                    <th className="text-left py-1">Estimated hours</th>
-                    <th className="text-left py-1">Real hours</th>
-                    <th className="text-left py-1">State</th>
-                    <th className="text-left py-1">Developer</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTasks.map((task, i) => (
-                    <tr key={i} className="border-t border-neutral-700">
-                      <td className="py-2">{task.name}</td>
-                      <td className="py-2">{task.estimatedhours}</td>
-                      <td className="py-2">{task.realhours}</td>
-                      <td className="py-2">
-                        <span
-                          className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                            task.status === "Done"
-                              ? "bg-green-500 text-white"
-                              : task.status === "Pending"
-                              ? "bg-red-500 text-white"
-                              : "bg-yellow-400 text-black"
-                          }`}
-                        >
-                          {task.status}
-                        </span>
-                      </td>
-                      <td className="py-2 text-sm text-gray-300">{task.user}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-
-    
-        <div className="bg-[#2a2a2a] rounded p-4 md:col-span-2">
-        <h3 className="text-lg font-semibold mb-4">Productivity</h3>
-          <div className="text-sm text-gray-400 mb-4">
-          <h2 className="text-lg font-semibold text-white mb-4 px-6 pt-4">Worked hours and Completed Tasks</h2>
-
-            <label className="mr-2">See productivity by:</label>
-            <select
-              value={productivityView}
-              onChange={(e) => setProductivityView(e.target.value)}
-              className="bg-[#1a1a1a] text-white border border-neutral-600 rounded px-2 py-1"
-            >
-              <option value="Equipo">Team</option>
-              <option value="Persona">Developer</option>
-            </select>
-          </div>
-
-          {productivityView === "Equipo" ? (
-             sprintKpiTeam ? (
-
-            <>
-              <table className="w-full text-sm mb-6">
-                <thead className="text-gray-400">
-                  <tr>
-                    <th className="text-left py-1">Worked hours</th>
-                    <th className="text-left py-1">Completed tasks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[sprintKpiTeam].map((item, i) => (
-                    <tr key={i} className="border-t border-neutral-700">
-                      <td className="py-2">{item.hours} hrs</td>
-                      <td className="py-2">{item.tasks}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="w-full flex items-center justify-center mb-4 relative">
-              <ResponsiveContainer width="50%" height={200}>
-                <BarChart data={[sprintKpiTeam]} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#555" />
-                  <XAxis dataKey="sprint" stroke="#ccc" />
-                  <YAxis stroke="#ccc" />
-                  <Tooltip />
-                  <Bar dataKey="hours" fill="#c54534" name="Worked hours" />
-                  <Bar dataKey="tasks" fill="#a9312c" name="Completed tasks" />
-                </BarChart>
-              </ResponsiveContainer>
-              </div>
-            </>
-             ) : (
-              <p className="text-gray-400">No data available for this sprint.</p>
-            )
-          ) : (
-            <>
-              <table className="w-full text-sm mb-6">
-                <thead className="text-gray-400">
-                  <tr>
-                    <th className="text-left py-1">Developer</th>
-                    <th className="text-left py-1">Worked hours</th>
-                    <th className="text-left py-1">Completed tasks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sprintKpiPerson.map((item, i) => (
-                    <tr key={i} className="border-t border-neutral-700">
-                      <td className="py-2">{item.name}</td>
-                      <td className="py-2">{item.hours} hrs</td>
-                      <td className="py-2">{item.tasks}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="w-full flex items-center justify-center mb-4 relative">
-              <ResponsiveContainer width="70%" height={200}>
-                <BarChart data={kpiPersonData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#555" />
-                  <XAxis dataKey="name" stroke="#ccc" />
-                  <YAxis stroke="#ccc" />
-                  <Tooltip />
-                  <Bar dataKey="hours" fill="#c54534" name="Worked hours" />
-                  <Bar dataKey="tasks" fill="#a9312c" name="Completed tasks" />
-                </BarChart>
-              </ResponsiveContainer>
-              </div>
-            </>
-          )}
-            <h2 className="text-lg font-semibold mb-4 px-6 pt-4">Estimated vs Real Hours</h2>
-            <div className="w-fill flex items-center justify-center mb-8">
-              <ResponsiveContainer width="70%" height={300}>
-                <BarChart data={hoursComparisonByDeveloper} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                  <XAxis dataKey="name" stroke="#ccc" />
-                  <YAxis stroke="#ccc" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="estimated" fill="#c54534" name="Estimated Hours" />
-                  <Bar dataKey="real" fill="#a9312c" name="Real Hours" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-[#2a2a2a] rounded p-4 md:col-span-2 mt-6">
-              <h3 className="text-lg font-semibold mb-4">Horas trabajadas por sprint y desarrollador</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={sprintTable} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                  <XAxis dataKey="sprint" stroke="#ccc" />
-                  <YAxis stroke="#ccc" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="Daniela" fill="#A7CECB" />
-                  <Bar dataKey="Dora" fill="#8BA6A9" />
-                  <Bar dataKey="Carlos" fill="#4B5842" />
-                  <Bar dataKey="Rodrigo" fill="#CACC90" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-[#2a2a2a] rounded p-4 md:col-span-2 mt-6">
-              <h3 className="text-lg font-semibold mb-4">Tareas completadas por sprint y desarrollador</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={completedSprintTable} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                  <XAxis dataKey="sprint" stroke="#ccc" />
-                  <YAxis stroke="#ccc" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="Daniela" fill="#4e79a7" />
-                  <Bar dataKey="Dora" fill="#f28e2b" />
-                  <Bar dataKey="Carlos" fill="#e15759" />
-                  <Bar dataKey="Rodrigo" fill="#76b7b2" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-
-
-        </div>
-      
-
-      </div>
+              </td>
+              <td className="py-2 text-sm text-gray-300">{task.user}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+  </div>
+</div>
+
+{/* BLOQUE DE PRODUCTIVIDAD - SEGUNDA FILA */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+    {/* Productivity - All Sprints */}
+  <div className="bg-[#2a2a2a] rounded p-4">
+    <h3 className="text-lg font-semibold mb-4">Productivity - Project</h3>
+    <h4 className="text-md font-semibold text-white mb-4">Worked hours by developer</h4>
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={sprintTable}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+        <XAxis dataKey="sprint" stroke="#ccc" />
+        <YAxis stroke="#ccc" />
+        <Tooltip />
+        <Legend />
+        <Bar dataKey="Daniela" fill="#A7CECB" />
+        <Bar dataKey="Dora" fill="#8BA6A9" />
+        <Bar dataKey="Carlos" fill="#4B5842" />
+        <Bar dataKey="Rodrigo" fill="#CACC90" />
+      </BarChart>
+    </ResponsiveContainer>
+
+    <h4 className="text-md font-semibold text-white mt-6 mb-4">Completed tasks by developer</h4>
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={completedSprintTable}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+        <XAxis dataKey="sprint" stroke="#ccc" />
+        <YAxis stroke="#ccc" />
+        <Tooltip />
+        <Legend />
+        <Bar dataKey="Daniela" fill="#A7CECB" />
+        <Bar dataKey="Dora" fill="#8BA6A9" />
+        <Bar dataKey="Carlos" fill="#4B5842" />
+        <Bar dataKey="Rodrigo" fill="#CACC90" />
+      </BarChart>
+    </ResponsiveContainer>
+    <div className="bg-[#2a2a2a] rounded p-4 mt-6">
+      <h3 className="text-lg font-semibold mb-4">Total Worked Hours by Sprint</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={totalHoursBySprint}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+          <XAxis dataKey="sprint" stroke="#ccc" />
+          <YAxis stroke="#ccc" />
+          <Tooltip />
+          <Legend />
+          <Line type="monotone" dataKey="hours" stroke="#A7CECB" name="Total Hours" />
+        </LineChart>
+      </ResponsiveContainer>
+
     </div>
+  </div>
+  {/* Productivity - Current Sprint */}
+  <div className="bg-[#2a2a2a] rounded p-4">
+    <h3 className="text-lg font-semibold mb-4">Productivity - Current Sprint</h3>
+    <div className="text-sm text-gray-400 mb-4">
+      <label className="mr-2">See productivity by:</label>
+      <select
+        value={productivityView}
+        onChange={(e) => setProductivityView(e.target.value)}
+        className="bg-[#1a1a1a] text-white border border-neutral-600 rounded px-2 py-1"
+      >
+        <option value="Equipo">Team</option>
+        <option value="Persona">Developer</option>
+      </select>
+    </div>
+
+    {productivityView === "Equipo" && sprintKpiTeam ? (
+      <>
+        <table className="w-full text-sm mb-6">
+          <thead className="text-gray-400">
+            <tr>
+              <th className="text-left py-1">Worked hours</th>
+              <th className="text-left py-1">Completed tasks</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t border-neutral-700">
+              <td className="py-2">{sprintKpiTeam.hours} hrs</td>
+              <td className="py-2">{sprintKpiTeam.tasks}</td>
+            </tr>
+          </tbody>
+        </table>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={[sprintKpiTeam]}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#555" />
+            <XAxis dataKey="sprint" stroke="#ccc" />
+            <YAxis stroke="#ccc" />
+            <Tooltip />
+            <Bar dataKey="hours" fill="#8fc0a9" />
+            <Bar dataKey="tasks" fill="#d0b17a" />
+          </BarChart>
+        </ResponsiveContainer>
+      </>
+    ) : (
+      <>
+        <table className="w-full text-sm mb-6">
+          <thead className="text-gray-400">
+            <tr>
+              <th className="text-left py-1">Developer</th>
+              <th className="text-left py-1">Worked hours</th>
+              <th className="text-left py-1">Completed tasks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sprintKpiPerson.map((item, i) => (
+              <tr key={i} className="border-t border-neutral-700">
+                <td className="py-2">{item.name}</td>
+                <td className="py-2">{item.hours} hrs</td>
+                <td className="py-2">{item.tasks}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={kpiPersonData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#555" />
+            <XAxis dataKey="name" stroke="#ccc" />
+            <YAxis stroke="#ccc" />
+            <Tooltip />
+            <Bar dataKey="hours" fill="#8fc0a9" />
+            <Bar dataKey="tasks" fill="#d0b17a" />
+          </BarChart>
+        </ResponsiveContainer>
+      </>
+    )}
+        <h2 className="text-lg font-semibold mb-4 pt-6">Estimated vs Real Hours</h2>
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={hoursComparisonByDeveloper} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+        <XAxis dataKey="name" stroke="#ccc" />
+        <YAxis stroke="#ccc" />
+        <Tooltip />
+        <Legend />
+        <Bar dataKey="estimated" fill="#8fc0a9" name="Estimated Hours" />
+        <Bar dataKey="real" fill="#d0b17a" name="Real Hours" />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+
+
+</div>
+</div>
+</div>
   );
 };
 
