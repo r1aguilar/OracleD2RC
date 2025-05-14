@@ -44,9 +44,10 @@ public class WebSecurityConfiguration {
                     new AntPathRequestMatcher("/dashboard"),
                     new AntPathRequestMatcher("/registro"),
                     new AntPathRequestMatcher("/login"),
-                    new AntPathRequestMatcher("/dashManager")
+                    new AntPathRequestMatcher("/dashManager"),
+                    new AntPathRequestMatcher("/analytics")
+
                 ).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/analytics")).hasAuthority("MANAGER")
                 .requestMatchers(new AntPathRequestMatcher("/dashdev")).hasAuthority("DEVELOPER")
                 .anyRequest().authenticated()
             .and()

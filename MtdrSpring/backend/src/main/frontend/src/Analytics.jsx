@@ -9,21 +9,11 @@ const AnalyticsManager = () => {
   const [productivityView, setProductivityView] = useState("Equipo");
   const [selectedSprint, setSelectedSprint] = useState("Sprint1");
   const [allTasks, setAllTasks] = useState([]);
-  
-
-  const sprints = [
-    { name: "Sprint1", date: "Feb 16, 2025", status: "Completed", progress: 100 },
-    { name: "Sprint2", date: "Feb 23, 2025", status: "Completed", progress: 100 },
-    { name: "Sprint3", date: "Mar 2, 2025", status: "Completed", progress: 100 },
-    { name: "Sprint4", date: "Mar 9, 2025", status: "Completed", progress: 100 },
-    { name: "Sprint21", date: "Mar 16, 2025", status: "Completed", progress: 100 },
-    { name: "Sprint22", date: "Mar 30, 2025", status: "Completed", progress: 100 },
-    { name: "Sprint23", date: "Apr 6, 2025", status: "Completed", progress: 100 },
-    { name: "Sprint41", date: "Apr 13, 2025", status: "Completed", progress: 100 },
-    { name: "Sprint61", date: "Apr 27, 2025", status: "Completed", progress: 100 },
+  const [sprints, setSprints] = useState([]);
+  const [userTasks, setUserTasks] = useState([]);
 
 
-  ];
+
 
   const userMap = {
     1: "Daniela",
@@ -64,94 +54,221 @@ const AnalyticsManager = () => {
   
     fetchTasks();
   }, [selectedSprint]);
-  
-  
 
-  const sprintTasks = allTasks.filter(t => t.sprint === selectedSprint);
-  const filteredTasks = selectedFilter === "ALL"
-  ? sprintTasks
-  : sprintTasks.filter((t) =>
-      selectedFilter === "Completed"
-        ? t.status === "Done"
-        : selectedFilter === "Pending"
-        ? t.status === "Pending"
-        : t.status === "Doing"
-    );
+  useEffect(() => {
+  const fetchSprints = async () => {
+    try {
+      const response = await fetch("http://localhost:8080/pruebasSprint/SprintsForKPIs/1");
+      const data = await response.json();
 
+      const formattedSprints = data.map(sprint => ({
+        id: sprint.id,
+        name: `Sprint${sprint.id}`,
+        label: sprint.nombre,
+        date: new Date(sprint.fechaFin).toLocaleDateString("en-US", {
+          month: "short", day: "numeric", year: "numeric"
+        }),
+        status: sprint.tareasCompletadas === 0 //completadas y totales estan cambiadas
+          ? "Pending"
+          : sprint.tareasTotales === sprint.tareasCompletadas
+          ? "Completed"
+          : "Doing",
+        progress: sprint.tareasTotales === 0
+          ? 0
+          : Math.round((sprint.tareasTotales / sprint.tareasCompletadas) * 100)
+      }));
 
-  const totalStoryPoints = sprintTasks.reduce((sum, t) => sum + (t.storypoints || 0), 0);
-
-
-  const kpiTeam = sprints.map((sprint) => {
-    const sprintData = allTasks.filter(t => t.sprint === sprint.name);
-    const hours = sprintData.reduce((sum, t) => sum + t.realhours, 0);
-    const tasks = sprintData.filter(t => t.status === "Done").length;
-    return {
-      sprint: sprint.name,
-      hours,
-      tasks,
-    };
-  });
-
-  const kpiPerson = [];
-  allTasks.forEach(t => {
-    const key = `${t.user}-${t.sprint}`;
-    let entry = kpiPerson.find(e => e.name === t.user && e.sprint === t.sprint);
-    if (!entry) {
-      entry = { name: t.user, sprint: t.sprint, hours: 0, tasks: 0 };
-      kpiPerson.push(entry);
+      setSprints(formattedSprints);
+    } catch (error) {
+      console.error("Error fetching sprint KPIs:", error);
     }
-    entry.hours += t.realhours;
-    if (t.status === "Done") entry.tasks += 1;
-  });
+  };
 
-  const sprintKpiTeam = kpiTeam.find(k => k.sprint === selectedSprint);
-  const sprintKpiPerson = kpiPerson.filter(k => k.sprint === selectedSprint);
+  fetchSprints();
+}, []);
 
-  const kpiPersonAggregated = sprintKpiPerson.reduce((acc, cur) => {
-    const key = cur.name;
-    if (!acc[key]) acc[key] = { name: cur.name, hours: 0, tasks: 0 };
-    acc[key].hours += cur.hours;
-    acc[key].tasks += cur.tasks;
-    return acc;
-  }, {});
 
-  const kpiPersonData = Object.values(kpiPersonAggregated);
+useEffect(() => {
+  const fetchAllUserTasks = async () => {
+    try {
+      const userIds = [1, 2, 3, 4];
+      const allTasks = [];
 
-  const progress = Math.round(
-    (sprintTasks.filter((task) => task.status === "Done").length / sprintTasks.length) * 100 || 0
+      for (const id of userIds) {
+        const res = await fetch(`http://localhost:8080/pruebas/TareasUsuario/${id}`);
+        const data = await res.json();
+
+        const formatted = data.map(t => ({
+          user: userMap[t.idEncargado] || "Developer",
+          sprint: `Sprint${t.idSprint}`,
+          realhours: t.tiempoReal || 0,
+          status:
+            t.idColumna === 1 ? "Pending" :
+            t.idColumna === 2 ? "Doing" : "Done"
+        }));
+
+
+        allTasks.push(...formatted);
+      }
+
+      setUserTasks(allTasks);
+    } catch (err) {
+      console.error("Error fetching user tasks:", err);
+    }
+  };
+
+  fetchAllUserTasks();
+}, []);
+  
+  
+
+const sprintTasks = allTasks.filter(t => t.sprint === selectedSprint);
+const filteredTasks = selectedFilter === "ALL"
+? sprintTasks
+: sprintTasks.filter((t) =>
+    selectedFilter === "Completed"
+      ? t.status === "Done"
+      : selectedFilter === "Pending"
+      ? t.status === "Pending"
+      : t.status === "Doing"
   );
 
-  const sprintOptions = [...new Set(allTasks.map(task => task.sprint))];
 
-  const hoursPerDeveloper = {};
-  sprintTasks.forEach(task => {
-    if (!hoursPerDeveloper[task.user]) {
-      hoursPerDeveloper[task.user] = { name: task.user, estimated: 0, real: 0 };
-    }
-    hoursPerDeveloper[task.user].estimated += task.estimatedhours;
-    hoursPerDeveloper[task.user].real += task.realhours;
+const totalStoryPoints = sprintTasks.reduce((sum, t) => sum + (t.storypoints || 0), 0);
+
+
+const kpiTeam = sprints.map((sprint) => {
+  const sprintData = allTasks.filter(t => t.sprint === sprint.name);
+  const hours = sprintData.reduce((sum, t) => sum + t.realhours, 0);
+  const tasks = sprintData.filter(t => t.status === "Done").length;
+  return {
+    sprint: sprint.name,
+    hours,
+    tasks,
+  };
+});
+
+const kpiPerson = [];
+allTasks.forEach(t => {
+  const key = `${t.user}-${t.sprint}`;
+  let entry = kpiPerson.find(e => e.name === t.user && e.sprint === t.sprint);
+  if (!entry) {
+    entry = { name: t.user, sprint: t.sprint, hours: 0, tasks: 0 };
+    kpiPerson.push(entry);
+  }
+  entry.hours += t.realhours;
+  if (t.status === "Done") entry.tasks += 1;
+});
+
+const sprintKpiTeam = kpiTeam.find(k => k.sprint === selectedSprint);
+const sprintKpiPerson = kpiPerson.filter(k => k.sprint === selectedSprint);
+
+const kpiPersonAggregated = sprintKpiPerson.reduce((acc, cur) => {
+  const key = cur.name;
+  if (!acc[key]) acc[key] = { name: cur.name, hours: 0, tasks: 0 };
+  acc[key].hours += cur.hours;
+  acc[key].tasks += cur.tasks;
+  return acc;
+}, {});
+
+const kpiPersonData = Object.values(kpiPersonAggregated);
+
+const progress = Math.round(
+  (sprintTasks.filter((task) => task.status === "Done").length / sprintTasks.length) * 100 || 0
+);
+
+const sprintOptions = [...new Set(allTasks.map(task => task.sprint))];
+
+const hoursPerDeveloper = {};
+sprintTasks.forEach(task => {
+  if (!hoursPerDeveloper[task.user]) {
+    hoursPerDeveloper[task.user] = { name: task.user, estimated: 0, real: 0 };
+  }
+  hoursPerDeveloper[task.user].estimated += task.estimatedhours;
+  hoursPerDeveloper[task.user].real += task.realhours;
+});
+const hoursComparisonByDeveloper = Object.values(hoursPerDeveloper);
+
+const getSprintProgress = (sprintName) => {
+  const tasksForSprint = allTasks.filter(t => t.sprint === sprintName);
+  const total = tasksForSprint.length;
+  const done = tasksForSprint.filter(t => t.status === "Done").length;
+  return total === 0 ? 0 : Math.round((done / total) * 100);
+};
+
+const getSprintStatus = (sprintName) => {
+  const tasks = allTasks.filter(t => t.sprint === sprintName);
+  if (tasks.length === 0) return "Pending";
+  const total = tasks.length;
+  const done = tasks.filter(t => t.status === "Done").length;
+
+  if (done === 0) return "Pending";
+  if (done < total) return "Doing";
+  return "Completed";
+};
+
+// Agrupar horas reales por sprint y usuario
+const hoursPerSprint = {};
+
+userTasks.forEach(t => {
+  const key = `${t.user}-${t.sprint}`;
+  if (!hoursPerSprint[key]) {
+    hoursPerSprint[key] = { sprint: t.sprint, user: t.user, hours: 0 };
+  }
+  hoursPerSprint[key].hours += t.realhours;
+});
+
+const grouped = Object.values(hoursPerSprint);
+
+// Ordenar sprints correctamente
+const uniqueSprints = [...new Set(userTasks.map(row => row.sprint))].sort((a, b) => {
+  const numA = parseInt(a.replace("Sprint", ""));
+  const numB = parseInt(b.replace("Sprint", ""));
+  return numA - numB;
+});
+
+const uniqueUsers = [...new Set(userTasks.map(row => row.user))];
+
+// Crear tabla de horas trabajadas
+const sprintTable = uniqueSprints.map(sprint => {
+  const row = { sprint };
+  uniqueUsers.forEach(user => {
+    const match = grouped.find(r => r.sprint === sprint && r.user === user);
+    row[user] = match ? match.hours : 0;
   });
-  const hoursComparisonByDeveloper = Object.values(hoursPerDeveloper);
-  
-  const getSprintProgress = (sprintName) => {
-    const tasksForSprint = allTasks.filter(t => t.sprint === sprintName);
-    const total = tasksForSprint.length;
-    const done = tasksForSprint.filter(t => t.status === "Done").length;
-    return total === 0 ? 0 : Math.round((done / total) * 100);
-  };
-  
-  const getSprintStatus = (sprintName) => {
-    const tasks = allTasks.filter(t => t.sprint === sprintName);
-    if (tasks.length === 0) return "Pending";
-    const total = tasks.length;
-    const done = tasks.filter(t => t.status === "Done").length;
-  
-    if (done === 0) return "Pending";
-    if (done < total) return "Doing";
-    return "Completed";
-  };
-  
+  return row;
+});
+
+// Agrupar tareas completadas por sprint y usuario
+const completedTasksPerSprint = {};
+
+userTasks.forEach(t => {
+  if (t.status === "Done") {
+    const key = `${t.user}-${t.sprint}`;
+    if (!completedTasksPerSprint[key]) {
+      completedTasksPerSprint[key] = { sprint: t.sprint, user: t.user, tasks: 0 };
+    }
+    completedTasksPerSprint[key].tasks += 1;
+  }
+});
+
+const groupedCompleted = Object.values(completedTasksPerSprint);
+
+// Crear tabla de tareas completadas
+const completedSprintTable = uniqueSprints.map(sprint => {
+  const row = { sprint };
+  uniqueUsers.forEach(user => {
+    const match = groupedCompleted.find(r => r.sprint === sprint && r.user === user);
+    row[user] = match ? match.tasks : 0;
+  });
+  return row;
+});
+
+
+
+
+
+
 
   return (
     <div className="flex h-screen bg-[#1a1a1a]">
@@ -214,22 +331,21 @@ const AnalyticsManager = () => {
                     <td className="py-2">{sprint.date}</td>
                     <td className="py-2 text-sm font-semibold">
                       <span className={
-                        getSprintStatus(sprint.name) === "Completed" ? "text-green-400" :
-                        getSprintStatus(sprint.name) === "Doing" ? "text-yellow-400" :
-                        "text-transparent"
+                        sprint.status === "Completed" ? "text-green-400" :
+                        sprint.status === "Doing" ? "text-yellow-400" : "text-transparent"
                       }>
-                        {getSprintStatus(sprint.name)}
+                        {sprint.status}
                       </span>
                     </td>
                     <td className="py-2">
                       <div className="bg-neutral-800 w-full h-2 rounded-full">
                         <div
                           className="bg-red-500 h-2 rounded-full"
-                          style={{ width: `${getSprintProgress(sprint.name)}%` }}
+                          style={{ width: `${sprint.progress}%` }}
                         ></div>
                       </div>
-                      <span className="text-xs text-gray-400 ml-1">{getSprintProgress(sprint.name)}%</span>
-                      </td>
+                      <span className="text-xs text-gray-400 ml-1">{sprint.progress}%</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -310,6 +426,8 @@ const AnalyticsManager = () => {
           </div>
 
           {productivityView === "Equipo" ? (
+             sprintKpiTeam ? (
+
             <>
               <table className="w-full text-sm mb-6">
                 <thead className="text-gray-400">
@@ -340,6 +458,9 @@ const AnalyticsManager = () => {
               </ResponsiveContainer>
               </div>
             </>
+             ) : (
+              <p className="text-gray-400">No data available for this sprint.</p>
+            )
           ) : (
             <>
               <table className="w-full text-sm mb-6">
@@ -388,9 +509,44 @@ const AnalyticsManager = () => {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <div className="bg-[#2a2a2a] rounded p-4 md:col-span-2 mt-6">
+              <h3 className="text-lg font-semibold mb-4">Horas trabajadas por sprint y desarrollador</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={sprintTable} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                  <XAxis dataKey="sprint" stroke="#ccc" />
+                  <YAxis stroke="#ccc" />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="Daniela" fill="#A7CECB" />
+                  <Bar dataKey="Dora" fill="#8BA6A9" />
+                  <Bar dataKey="Carlos" fill="#4B5842" />
+                  <Bar dataKey="Rodrigo" fill="#CACC90" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-[#2a2a2a] rounded p-4 md:col-span-2 mt-6">
+              <h3 className="text-lg font-semibold mb-4">Tareas completadas por sprint y desarrollador</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={completedSprintTable} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                  <XAxis dataKey="sprint" stroke="#ccc" />
+                  <YAxis stroke="#ccc" />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="Daniela" fill="#4e79a7" />
+                  <Bar dataKey="Dora" fill="#f28e2b" />
+                  <Bar dataKey="Carlos" fill="#e15759" />
+                  <Bar dataKey="Rodrigo" fill="#76b7b2" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
 
 
         </div>
+      
+
       </div>
     </div>
     </div>
