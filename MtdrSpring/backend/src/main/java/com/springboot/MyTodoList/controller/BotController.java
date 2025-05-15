@@ -1001,7 +1001,7 @@ public class BotController extends TelegramLongPollingBot {
 			BotHelper.sendMessageToTelegram(chatId, "Please write the new value for " + field, this);
 		} else if (callbackData.startsWith("CONFIRM_ACCEPT_TASK")) {
 			int tareaId = Integer.parseInt(callbackData.replace("CONFIRM_ACCEPT_TASK ", ""));
-			String errorMessage = "No se pudo aceptar la tarea, debe llenar todos los campos";
+			String errorMessage = "Task could not be accepted, all fields must be filled before.";
 			// Obtener la tarea actual
 			Tarea tarea = tareaService.getItemById(tareaId).getBody();
 			if (tarea != null) {

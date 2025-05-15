@@ -8,6 +8,9 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave }) => {
   const [maxDate, setMaxDate] = useState("");
   const [error, setError] = useState(null);
 
+  // Determinar si la tarea está en estado "done" (columna 3)
+  const isDone = task.idColumna === 3;
+
   useEffect(() => {
     if (task?.idSprint && sprints?.length > 0) {
       const foundSprint = sprints.find(s => Number(s.id) === Number(task.idSprint));
@@ -42,6 +45,17 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave }) => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleHoursChange = (e) => {
+    const { value } = e.target;
+    // Validar que sea un número entero positivo
+    if (value === '' || (/^\d+$/.test(value) && parseInt(value) >= 0)) {
+      setEditedTask(prev => ({
+        ...prev,
+        tiempoReal: value === '' ? '' : parseInt(value)
+      }));
+    }
   };
 
   const handleDateChange = (e) => {
@@ -80,6 +94,14 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave }) => {
         
         if (dueDate < startDate || dueDate > endDate) {
           throw new Error(`La fecha debe estar entre ${startDate.toLocaleDateString()} y ${endDate.toLocaleDateString()}`);
+        }
+      }
+
+      // Validación de horas reales si está en done
+      if (isDone) {
+        const horasReales = parseInt(editedTask.tiempoReal);
+        if (isNaN(horasReales) || horasReales < 0) {
+          throw new Error("Las horas reales deben ser un número entero positivo");
         }
       }
 
@@ -182,12 +204,23 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave }) => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Story Points</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Horas Reales {!isDone && '(Solo para tareas completadas)'}
+                </label>
                 <input
                   type="number"
-                  value={task.storyPoints || 'N/A'}
-                  readOnly
-                  className="w-full bg-[#333] border border-gray-600 rounded px-3 py-2 text-gray-400 cursor-not-allowed"
+                  name="tiempoReal"
+                  value={editedTask.tiempoReal || ''}
+                  onChange={handleHoursChange}
+                  min="0"
+                  step="1"
+                  className={`w-full border rounded px-3 py-2 ${
+                    isDone 
+                      ? 'bg-[#1a1a1a] border-gray-600 text-white' 
+                      : 'bg-[#333] border-gray-600 text-gray-400 cursor-not-allowed'
+                  }`}
+                  disabled={!isDone}
+                  required={isDone}
                 />
               </div>
             </div>
