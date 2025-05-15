@@ -29,16 +29,17 @@ const BacklogManager = () => {
     setActiveTaskId(event.active.id);
   };
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = async (event) => {
     const { active, over } = event;
-
     if (!active || !over) return;
 
     const draggedTask = active.data.current?.task;
     const targetSprintId = over.id;
 
+    // Don't do anything if dropped on the same sprint
     if (draggedTask.idSprint === targetSprintId) return;
 
+    const originalSprintId = draggedTask.idSprint;
     const targetSprint = sprints.find((s) => s.id === targetSprintId);
 
     const updatedTask = {
@@ -48,13 +49,56 @@ const BacklogManager = () => {
       fechaVencimiento: targetSprint?.fechaFin || null,
     };
 
+    // Optimistically update the task in UI
     setTasks((prevTasks) =>
       prevTasks.map((t) => (t.id === draggedTask.id ? updatedTask : t))
     );
 
-    // ✅ Log for verification
-    console.log("Task updated after drag:", updatedTask);
+    try {
+      const response = await fetch(`/pruebas/updateTarea/${draggedTask.rawId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idTarea: draggedTask.rawId,
+          idEncargado: draggedTask.idEncargado,
+          idProyecto: draggedTask.idProyecto,
+          idColumna: draggedTask.idColumna,
+          idSprint: targetSprintId,
+          nombre: draggedTask.title,
+          descripcion: draggedTask.description,
+          prioridad: draggedTask.prioridad,
+          fechaInicio: targetSprint?.fechaInicio || null,
+          fechaVencimiento: targetSprint?.fechaFin || null,
+          fechaCompletado: draggedTask.fechaCompletado,
+          storyPoints: draggedTask.storyPoints,
+          tiempoReal: draggedTask.tiempoReal,
+          tiempoEstimado: draggedTask.tiempoEstimado,
+          aceptada: draggedTask.aceptada,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
+      console.log("Task updated successfully in backend");
+    } catch (error) {
+      console.error("Failed to update task:", error);
+
+      // Roll back the UI if the update failed
+      const revertedTask = {
+        ...draggedTask,
+        idSprint: originalSprintId,
+        fechaInicio: draggedTask.fechaInicio,
+        fechaVencimiento: draggedTask.fechaVencimiento,
+      };
+
+      setTasks((prevTasks) =>
+        prevTasks.map((t) => (t.id === draggedTask.id ? revertedTask : t))
+      );
+    }
   };
+
 
 
   const fetchProyectos = useCallback(async () => {
@@ -265,11 +309,15 @@ const BacklogManager = () => {
         >
           <div className="space-y-6">
             {sprints.map((sprint) => (
-              <SprintColumn key={sprint.id} sprint={sprint}>
+              <SprintColumn key={sprint.id} sprint={sprint} activeTaskId={activeTaskId}>
                 {tasks
                   .filter((task) => task.idSprint === sprint.id)
                   .map((task) => (
-                    <TaskChip key={task.id} task={task} />
+                    <TaskChip
+                      key={task.id}
+                      task={task}
+                      isDropTarget={activeTaskId && activeTaskId === task.id}
+                    />
                   ))}
               </SprintColumn>
             ))}
