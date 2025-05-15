@@ -77,9 +77,16 @@ const TaskList = ({ columnId, tasks, onTaskClick }) => {
             </span>
             <h3 className="font-semibold text-white mt-2">{task.title}</h3>
             <p className="text-sm text-gray-400">{task.description}</p>
-            <p className="text-xs text-gray-500 mt-2">
-              {new Date(task.fechaVencimiento).toLocaleDateString()}
-            </p>
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-xs text-gray-500">
+                {new Date(task.fechaVencimiento).toLocaleDateString()}
+              </p>
+              {task.idColumna === 3 && task.tiempoReal > 0 && (
+                <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
+                  {task.tiempoReal} hrs
+                </span>
+              )}
+            </div>
           </div>
         </SortableItem>
       ))}
@@ -117,7 +124,6 @@ const DashDev = () => {
   const [originalTaskLocations, setOriginalTaskLocations] = useState({});
   const [sprints, setSprints] = useState([]);
   const [selectedSprints, setSelectedSprints] = useState(new Set());
-  const [debugSprintInfo, setDebugSprintInfo] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
 
@@ -153,10 +159,10 @@ const DashDev = () => {
           fechaVencimiento: task.fechaVencimiento,
           fechaCompletado: task.fechaCompletado,
           storyPoints: task.storyPoints,
-          tiempoReal: task.tiempoReal,
+          tiempoReal: task.tiempoReal || 0,
           tiempoEstimado: task.tiempoEstimado,
           prioridad: task.prioridad,
-          aceptada: 1,
+          aceptada: task.aceptada || 1,
           type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
         };
         const column = columnNames[task.idColumna];
@@ -283,8 +289,19 @@ const DashDev = () => {
         }
       }
 
-      // Asegurar que la prioridad sea número
+      // Validación de horas reales si está en done
+      if (updatedTask.idColumna === 3) {
+        const horasReales = parseInt(updatedTask.tiempoReal);
+        if (isNaN(horasReales) || horasReales < 0) {
+          throw new Error("Las horas reales deben ser un número entero positivo");
+        }
+      }
+
+      // Asegurar que los campos numéricos sean números
       const prioridad = Number(updatedTask.prioridad) || 1;
+      const tiempoReal = updatedTask.idColumna === 3 ? 
+        (Number(updatedTask.tiempoReal) || 0) : 
+        (updatedTask.tiempoReal || 0);
 
       const payload = {
         idTarea: updatedTask.rawId,
@@ -301,10 +318,12 @@ const DashDev = () => {
           fechaCompletado: updatedTask.fechaCompletado 
         }),
         storyPoints: updatedTask.storyPoints,
-        tiempoReal: updatedTask.tiempoReal,
+        tiempoReal: tiempoReal,
         tiempoEstimado: updatedTask.tiempoEstimado,
-        aceptada: updatedTask.aceptada,
+        aceptada: updatedTask.aceptada !== undefined ? updatedTask.aceptada : 1,
       };
+
+      console.log("Enviando datos al servidor:", payload); // Para depuración
 
       const response = await fetch(`/pruebas/updateTarea/${updatedTask.rawId}`, {
         method: "PUT",
@@ -326,6 +345,7 @@ const DashDev = () => {
       const updatedTaskData = {
         ...updatedTask,
         prioridad: responseData.prioridad || prioridad,
+        tiempoReal: responseData.tiempoReal || tiempoReal,
         fechaVencimiento: responseData.fechaVencimiento || updatedTask.fechaVencimiento,
         title: responseData.nombre || updatedTask.title,
         description: responseData.descripcion || updatedTask.description
@@ -444,13 +464,22 @@ const DashDev = () => {
       setTasks(prev => ({
         ...prev,
         [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
-        [targetColumn]: [...prev[targetColumn], { ...originalTask, idColumna: targetColumnId }]
+        [targetColumn]: [...prev[targetColumn], { 
+          ...originalTask, 
+          idColumna: targetColumnId,
+          // Resetear horas reales si se mueve fuera de "done"
+          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0
+        }]
       }));
       
       setAllTasks(prev => ({
         ...prev,
         [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
-        [targetColumn]: [...prev[targetColumn], { ...originalTask, idColumna: targetColumnId }]
+        [targetColumn]: [...prev[targetColumn], { 
+          ...originalTask, 
+          idColumna: targetColumnId,
+          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0
+        }]
       }));
 
       setOriginalTaskLocations(prev => ({
@@ -478,7 +507,7 @@ const DashDev = () => {
             fechaVencimiento: originalTask.fechaVencimiento,
             fechaCompletado: originalTask.fechaCompletado,
             storyPoints: originalTask.storyPoints,
-            tiempoReal: originalTask.tiempoReal,
+            tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0,
             tiempoEstimado: originalTask.tiempoEstimado,
             aceptada: originalTask.aceptada,
           }),
