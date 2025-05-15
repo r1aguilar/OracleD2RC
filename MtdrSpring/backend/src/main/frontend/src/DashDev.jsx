@@ -41,16 +41,15 @@ const columnNames = {
   3: "done",
 };
 
-// Create a separate droppable component for empty columns
 const EmptyDropArea = ({ columnId }) => {
-  const { setNodeRef, isOver } = useDroppable({
-    id: columnId
-  });
+  const { setNodeRef, isOver } = useDroppable({ id: columnId });
   
   return (
     <div 
       ref={setNodeRef}
-      className={`flex items-center justify-center h-32 bg-[#1a1a1a] rounded-lg border border-dashed ${isOver ? 'border-red-500 bg-[#252525]' : 'border-gray-600'}`}
+      className={`flex items-center justify-center h-32 bg-[#1a1a1a] rounded-lg border border-dashed ${
+        isOver ? 'border-red-500 bg-[#252525]' : 'border-gray-600'
+      }`}
     >
       <p className="text-gray-500">Drop tasks here</p>
     </div>
@@ -123,12 +122,8 @@ const DashDev = () => {
   const [showTaskModal, setShowTaskModal] = useState(false);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { 
-      activationConstraint: { distance: 8 } 
-    }),
-    useSensor(KeyboardSensor, { 
-      coordinateGetter: sortableKeyboardCoordinates 
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const fetchTasks = useCallback(async () => {
@@ -189,13 +184,9 @@ const DashDev = () => {
       const res = await fetch(`/pruebasSprint/SprintsForUser/${userId}`);
       const data = await res.json();
 
-      console.log("Fetched sprints:", data);
-      
       const validSprints = data.filter(sprint => 
         sprint && sprint.id !== undefined && sprint.id !== null
       );
-      
-      console.log("Fetched sprints:", validSprints);
       
       setSprints(validSprints);
       
@@ -206,8 +197,6 @@ const DashDev = () => {
       );
       
       setSelectedSprints(initialSelectedSprints);
-      console.log("Initial selected sprint IDs:", Array.from(initialSelectedSprints));
-      
     } catch (err) {
       console.error("Failed to fetch sprints", err);
     }
@@ -219,72 +208,29 @@ const DashDev = () => {
   }, [fetchTasks, fetchSprints]);
 
   useEffect(() => {
-    console.log("Selected sprints changed:", Array.from(selectedSprints));
-    console.log("All tasks:", allTasks);
-    
     if (selectedSprints.size === 0) {
-      setTasks({
-        pending: [],
-        doing: [],
-        done: []
-      });
+      setTasks({ pending: [], doing: [], done: [] });
       return;
     }
-    
-    const sprintTaskCounts = {};
-    Object.values(allTasks).forEach(columnTasks => {
-      columnTasks.forEach(task => {
-        if (!task.idSprint) {
-          console.warn("Task missing sprint ID:", task);
-          return;
-        }
-        
-        const sprintId = Number(task.idSprint);
-        if (isNaN(sprintId)) {
-          console.warn("Invalid sprint ID in task:", task);
-          return;
-        }
-        
-        sprintTaskCounts[sprintId] = (sprintTaskCounts[sprintId] || 0) + 1;
-      });
-    });
-    console.log("Tasks per sprint:", sprintTaskCounts);
     
     const filtered = Object.fromEntries(
       Object.entries(allTasks).map(([key, value]) => [
         key,
         value.filter((task) => {
           if (!task.idSprint) return false;
-          
           const taskSprintId = Number(task.idSprint);
           if (isNaN(taskSprintId)) return false;
-          
-          const isIncluded = selectedSprints.has(taskSprintId);
-          return isIncluded;
+          return selectedSprints.has(taskSprintId);
         })
       ])
     );
     
-    console.log("Filtered tasks:", filtered);
     setTasks(filtered);
-    
-    setDebugSprintInfo({
-      selectedSprints: Array.from(selectedSprints),
-      totalTasksPerSprint: sprintTaskCounts,
-      filteredTaskCount: Object.values(filtered).flat().length,
-      allTasksCount: Object.values(allTasks).flat().length
-    });
   }, [selectedSprints, allTasks]);
 
   const handleSprintToggle = (sprintId, isChecked) => {
     const numericSprintId = Number(sprintId);
-    
-    if (isNaN(numericSprintId)) {
-      console.error("Invalid sprint ID received:", sprintId);
-      return;
-    }
-    
-    console.log(`Toggle sprint ${numericSprintId} to ${isChecked}`);
+    if (isNaN(numericSprintId)) return;
     
     setSelectedSprints(prev => {
       const newSet = new Set(prev);
@@ -293,22 +239,18 @@ const DashDev = () => {
       } else {
         newSet.delete(numericSprintId);
       }
-      console.log("New selected sprints:", Array.from(newSet));
       return newSet;
     });
   };
 
   const findColumn = (itemId) => {
-    if (itemId === "pending" || itemId === "doing" || itemId === "done") {
-      return itemId;
-    }
+    if (["pending", "doing", "done"].includes(itemId)) return itemId;
     
     for (const colId of ["pending", "doing", "done"]) {
       if (tasks[colId].some(task => task.id === itemId)) {
         return colId;
       }
     }
-    
     return null;
   };
 
@@ -317,61 +259,90 @@ const DashDev = () => {
     setShowTaskModal(true);
   };
 
+  const updateTaskState = (state, updatedTask) => {
+    const newState = { ...state };
+    Object.keys(newState).forEach(col => {
+      newState[col] = newState[col].map(t => 
+        t.id === updatedTask.id ? updatedTask : t
+      );
+    });
+    return newState;
+  };
+
   const handleSaveTask = async (updatedTask) => {
     try {
+      // Validación del sprint
+      const taskSprint = sprints.find(s => Number(s.id) === Number(updatedTask.idSprint));
+      if (taskSprint) {
+        const dueDate = new Date(updatedTask.fechaVencimiento);
+        const startDate = new Date(taskSprint.fechaInicio);
+        const endDate = new Date(taskSprint.fechaFin);
+        
+        if (dueDate < startDate || dueDate > endDate) {
+          throw new Error(`La fecha debe estar entre ${startDate.toLocaleDateString()} y ${endDate.toLocaleDateString()}`);
+        }
+      }
+
+      // Asegurar que la prioridad sea número
+      const prioridad = Number(updatedTask.prioridad) || 1;
+
+      const payload = {
+        idTarea: updatedTask.rawId,
+        idEncargado: updatedTask.idEncargado,
+        idProyecto: updatedTask.idProyecto,
+        idColumna: updatedTask.idColumna,
+        idSprint: updatedTask.idSprint,
+        nombre: updatedTask.title,
+        descripcion: updatedTask.description,
+        prioridad: prioridad,
+        fechaInicio: updatedTask.fechaInicio,
+        fechaVencimiento: updatedTask.fechaVencimiento,
+        ...(updatedTask.fechaCompletado && { 
+          fechaCompletado: updatedTask.fechaCompletado 
+        }),
+        storyPoints: updatedTask.storyPoints,
+        tiempoReal: updatedTask.tiempoReal,
+        tiempoEstimado: updatedTask.tiempoEstimado,
+        aceptada: updatedTask.aceptada,
+      };
+
       const response = await fetch(`/pruebas/updateTarea/${updatedTask.rawId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idTarea: updatedTask.rawId,
-          idEncargado: updatedTask.idEncargado,
-          idProyecto: updatedTask.idProyecto,
-          idColumna: updatedTask.idColumna,
-          idSprint: updatedTask.idSprint,
-          nombre: updatedTask.title,
-          descripcion: updatedTask.description,
-          prioridad: updatedTask.prioridad,
-          fechaInicio: updatedTask.fechaInicio,
-          fechaVencimiento: updatedTask.fechaVencimiento,
-          fechaCompletado: updatedTask.fechaCompletado,
-          storyPoints: updatedTask.storyPoints,
-          tiempoReal: updatedTask.tiempoReal,
-          tiempoEstimado: updatedTask.tiempoEstimado,
-          aceptada: updatedTask.aceptada,
-        }),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token") || ''}`
+        },
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Error al actualizar la tarea");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Error ${response.status}`);
+      }
 
-      setTasks(prev => {
-        const newTasks = { ...prev };
-        Object.keys(newTasks).forEach(col => {
-          newTasks[col] = newTasks[col].map(t => 
-            t.id === updatedTask.id ? updatedTask : t
-          );
-        });
-        return newTasks;
-      });
+      const responseData = await response.json();
+      
+      // Actualizar estado local
+      const updatedTaskData = {
+        ...updatedTask,
+        prioridad: responseData.prioridad || prioridad,
+        fechaVencimiento: responseData.fechaVencimiento || updatedTask.fechaVencimiento,
+        title: responseData.nombre || updatedTask.title,
+        description: responseData.descripcion || updatedTask.description
+      };
 
-      setAllTasks(prev => {
-        const newAllTasks = { ...prev };
-        Object.keys(newAllTasks).forEach(col => {
-          newAllTasks[col] = newAllTasks[col].map(t => 
-            t.id === updatedTask.id ? updatedTask : t
-          );
-        });
-        return newAllTasks;
-      });
+      setTasks(prev => updateTaskState(prev, updatedTaskData));
+      setAllTasks(prev => updateTaskState(prev, updatedTaskData));
+
+      return responseData;
 
     } catch (error) {
-      console.error("Error saving task:", error);
+      console.error("Error al guardar:", error);
       throw error;
     }
   };
 
   const handleDragStart = ({ active }) => {
-    if (!active) return;
-    
     const column = findColumn(active.id);
     if (!column) return;
     
@@ -379,11 +350,10 @@ const DashDev = () => {
     setActiveId(active.id);
     setActiveTask(task || null);
     
-    setOriginalTaskLocations(prev => {
-      const updated = {...prev};
-      updated[active.id] = column;
-      return updated;
-    });
+    setOriginalTaskLocations(prev => ({
+      ...prev,
+      [active.id]: column
+    }));
   };
 
   const handleDragOver = ({ active, over }) => {
@@ -392,37 +362,29 @@ const DashDev = () => {
       return;
     }
     
-    const activeId = active.id;
-    const overId = over.id;
-    
-    const overColumn = ["pending", "doing", "done"].includes(overId) 
-      ? overId 
-      : findColumn(overId);
+    const overColumn = ["pending", "doing", "done"].includes(over.id) 
+      ? over.id 
+      : findColumn(over.id);
     
     setOverColumnId(overColumn);
     
-    const activeColumn = findColumn(activeId);
+    const activeColumn = findColumn(active.id);
     
-    if (!activeColumn || !overColumn || activeColumn === overColumn) {
-      return;
-    }
+    if (!activeColumn || !overColumn || activeColumn === overColumn) return;
     
     setTasks(prevTasks => {
       const activeItems = [...prevTasks[activeColumn]];
       const overItems = [...prevTasks[overColumn]];
       
-      const activeIndex = activeItems.findIndex(item => item.id === activeId);
+      const activeIndex = activeItems.findIndex(item => item.id === active.id);
       if (activeIndex === -1) return prevTasks;
       
       const taskToMove = { ...activeItems[activeIndex] };
       
-      const newActiveItems = activeItems.filter(item => item.id !== activeId);
-      const newOverItems = [...overItems, taskToMove];
-      
       return {
         ...prevTasks,
-        [activeColumn]: newActiveItems,
-        [overColumn]: newOverItems
+        [activeColumn]: activeItems.filter(item => item.id !== active.id),
+        [overColumn]: [...overItems, taskToMove]
       };
     });
   };
@@ -436,17 +398,14 @@ const DashDev = () => {
       return;
     }
 
-    const activeId = active.id;
-    const overId = over.id;
-
-    const sourceColumn = originalTaskLocations[activeId];
+    const sourceColumn = originalTaskLocations[active.id];
     let targetColumn = null;
 
-    if (["pending", "doing", "done"].includes(overId)) {
-      targetColumn = overId;
+    if (["pending", "doing", "done"].includes(over.id)) {
+      targetColumn = over.id;
     } else {
       for (const col of ["pending", "doing", "done"]) {
-        if (tasks[col].some(task => task.id === overId)) {
+        if (tasks[col].some(task => task.id === over.id)) {
           targetColumn = col;
           break;
         }
@@ -460,20 +419,18 @@ const DashDev = () => {
       return;
     }
 
-    const originalTask =
-      tasks[sourceColumn]?.find(task => task.id === activeId) || activeTask;
-
+    const originalTask = tasks[sourceColumn]?.find(task => task.id === active.id) || activeTask;
     if (!originalTask) {
-      console.error("Original task not found:", activeId);
+      console.error("Original task not found:", active.id);
       setActiveId(null);
       setActiveTask(null);
       return;
     }
 
     if (sourceColumn === targetColumn) {
-      if (overId !== targetColumn) {
-        const activeIndex = tasks[sourceColumn].findIndex(task => task.id === activeId);
-        const overIndex = tasks[targetColumn].findIndex(task => task.id === overId);
+      if (over.id !== targetColumn) {
+        const activeIndex = tasks[sourceColumn].findIndex(task => task.id === active.id);
+        const overIndex = tasks[targetColumn].findIndex(task => task.id === over.id);
         if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
           setTasks(prev => ({
             ...prev,
@@ -484,45 +441,30 @@ const DashDev = () => {
     } else {
       const targetColumnId = columnMap[targetColumn];
 
-      setTasks(prev => {
-        const updatedSource = prev[sourceColumn].filter(task => task.id !== activeId);
+      setTasks(prev => ({
+        ...prev,
+        [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
+        [targetColumn]: [...prev[targetColumn], { ...originalTask, idColumna: targetColumnId }]
+      }));
       
-        const alreadyInTarget = prev[targetColumn].some(task => task.id === activeId);
-        const updatedTarget = alreadyInTarget
-          ? prev[targetColumn]
-          : [...prev[targetColumn], { ...originalTask, idColumna: targetColumnId }];
-      
-        return {
-          ...prev,
-          [sourceColumn]: updatedSource,
-          [targetColumn]: updatedTarget,
-        };
-      });
-      
-      setAllTasks(prev => {
-        const updatedSource = prev[sourceColumn].filter(task => task.id !== activeId);
-        
-        const alreadyInTarget = prev[targetColumn].some(task => task.id === activeId);
-        const updatedTarget = alreadyInTarget
-          ? prev[targetColumn]
-          : [...prev[targetColumn], { ...originalTask, idColumna: targetColumnId }];
-        
-        return {
-          ...prev,
-          [sourceColumn]: updatedSource,
-          [targetColumn]: updatedTarget,
-        };
-      });
+      setAllTasks(prev => ({
+        ...prev,
+        [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
+        [targetColumn]: [...prev[targetColumn], { ...originalTask, idColumna: targetColumnId }]
+      }));
 
       setOriginalTaskLocations(prev => ({
         ...prev,
-        [activeId]: targetColumn,
+        [active.id]: targetColumn,
       }));
 
       try {
         const response = await fetch(`/pruebas/updateTarea/${originalTask.rawId}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("token") || ''}`
+          },
           body: JSON.stringify({
             idTarea: originalTask.rawId,
             idEncargado: originalTask.idEncargado,
@@ -545,7 +487,6 @@ const DashDev = () => {
         if (!response.ok) {
           throw new Error(`Server responded with ${response.status}`);
         }
-        console.log("Task updated successfully in backend");
       } catch (error) {
         console.error("Failed to update task:", error);
         fetchTasks();
@@ -589,13 +530,6 @@ const DashDev = () => {
               onSelect={handleSprintToggle}
               initialChecked={true}
             />
-            
-            {debugSprintInfo && (
-              <div className="fixed bottom-4 right-4 bg-black/80 text-white p-2 rounded text-xs max-w-xs z-50">
-                <div>Selected: {debugSprintInfo.selectedSprints.join(', ')}</div>
-                <div>Filtered/Total: {debugSprintInfo.filteredTaskCount}/{debugSprintInfo.allTasksCount}</div>
-              </div>
-            )}
             <div className="flex items-center gap-3">
               <Bell className="text-white cursor-pointer hover:text-red-500" />
               <UserCircle className="text-white w-8 h-8 cursor-pointer hover:text-red-500" />
@@ -609,11 +543,7 @@ const DashDev = () => {
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
-          measuring={{
-            droppable: {
-              strategy: 'always'
-            }
-          }}
+          measuring={{ droppable: { strategy: 'always' } }}
         >
           <main className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {Object.entries(tasks).map(([columnId, columnTasks]) => (
@@ -673,6 +603,7 @@ const DashDev = () => {
       {showTaskModal && (
         <TaskDetailsModal
           task={selectedTask}
+          sprints={sprints}
           onClose={() => setShowTaskModal(false)}
           onSave={handleSaveTask}
         />
