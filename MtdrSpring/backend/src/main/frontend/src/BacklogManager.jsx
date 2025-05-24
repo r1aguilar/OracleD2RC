@@ -5,6 +5,7 @@ import { Bell, UserCircle, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, DragOverlay} from "@dnd-kit/core";
 import SprintColumn from "./components/SprintColumn";
+import CreateSprintModal from "./components/CreateSprintModal";
 import TaskChip from "./components/TaskChip";
 
 
@@ -20,10 +21,13 @@ const BacklogManager = () => {
   const [selectedProyecto, setSelectedProyecto] = useState(null);
   const [selectedIntegrante, setSelectedIntegrante] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreateSprintModalOpen, setIsCreateSprintModalOpen] = useState(false);
   const navigate = useNavigate();
+  const [isChangingSprintStatus, setIsChangingSprintStatus] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor));
   const [activeTaskId, setActiveTaskId] = useState(null);
+  var completadoFlag = true;
 
   const handleDragStart = (event) => {
     setActiveTaskId(event.active.id);
@@ -41,6 +45,10 @@ const BacklogManager = () => {
 
     const originalSprintId = draggedTask.idSprint;
     const targetSprint = sprints.find((s) => s.id === targetSprintId);
+    const sourceSprint = sprints.find((s) => s.id === draggedTask.idSprint);
+
+      // Block if either sprint is completed
+    if (targetSprint?.completado || sourceSprint?.completado) return;
 
     const updatedTask = {
       ...draggedTask,
@@ -246,21 +254,78 @@ const BacklogManager = () => {
     setTasks(filtered);
   }, [selectedIntegrante, allTasks]);
 
+  // Inside BacklogManager component
+  const handleSprintStatusChange = async (sprintId, newStatus) => {
+    const sprint = sprints.find(s => s.id === sprintId);
+    if (!newStatus || isChangingSprintStatus) return;
 
-  const handleAddSprint = () => {
-    const newId = sprints.length + 1;
-    const newSprint = {
-      id: newId,
-      idProyecto: selectedProyecto,
-      nombre: `Sprint ${newId}`,
-      descripcion: `Sprint ${newId}`,
-      fechaInicio: new Date().toISOString().split("T")[0],
-      fechaFin: "-",
-      completado: "In progress",
-      deleted: 0
+    setIsChangingSprintStatus(true);
+
+    const sprintPayload = {
+      idSprint: sprint.id,
+      idProyecto: sprint.idProyecto,
+      nombre: sprint.nombre,
+      descripcion: sprint.descripcion,
+      fechaInicio: sprint.fechaInicio,
+      fechaFin: sprint.fechaFin,
+      completado: true,
+      deleted: false,
     };
-    setSprints([...sprints, newSprint]);
+
+    try {
+      const response = await fetch(`/pruebasSprint/CompleteSprint/${sprintId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sprintPayload),
+      });
+
+      if (!response.ok) throw new Error("Failed to complete sprint");
+
+      // Refresh sprints and tasks
+      await fetchSprints(selectedProyecto);
+      await fetchTasks(selectedProyecto);
+
+      console.log("Sprint completed and data refreshed");
+    } catch (error) {
+      console.error("Error completing sprint:", error);
+    } finally {
+      setIsChangingSprintStatus(false);
+    }
   };
+
+  const handleAddSprint = async (newSprint) => {
+    const sprintPayload = {
+      idSprint: newSprint.id,
+      idProyecto: newSprint.idProyecto,
+      nombre: newSprint.nombre,
+      descripcion: newSprint.descripcion,
+      fechaInicio: newSprint.fechaInicio,
+      fechaFin: newSprint.fechaFin,
+      completado: false,
+      deleted: false,
+    };
+
+    try {
+      const response = await fetch("/pruebasSprint/Sprints", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(sprintPayload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to add sprint");
+      }
+
+      // If response is OK, add sprint to local state
+      setSprints([...sprints, newSprint]);
+    } catch (error) {
+      console.error("Error adding sprint:", error);
+      // Optionally: show a UI notification to the user
+    }
+  };
+
 
   return (
     <div className="flex h-screen bg-[#1a1a1a]">
@@ -308,22 +373,36 @@ const BacklogManager = () => {
           onDragEnd={handleDragEnd}
         >
           <div className="space-y-6">
-            {sprints.map((sprint) => (
-              <SprintColumn key={sprint.id} sprint={sprint} activeTaskId={activeTaskId}>
-                {tasks
-                  .filter((task) => task.idSprint === sprint.id)
-                  .map((task) => (
-                    <TaskChip
-                      key={task.id}
-                      task={task}
-                      isDropTarget={activeTaskId && activeTaskId === task.id}
-                    />
-                  ))}
-              </SprintColumn>
-            ))}
+            {sprints.map((sprint, index) => {
+              const isLastSprint = sprint.completado === false && completadoFlag;
+              if(isLastSprint){completadoFlag = false;}
+
+              return (
+                <SprintColumn
+                  key={sprint.id}
+                  sprint={sprint}
+                  activeTaskId={activeTaskId}
+                  isLastSprint={isLastSprint}
+                  onStatusChange={handleSprintStatusChange}
+                  isDisabled={sprint.completado}
+                  isChangingStatus={isChangingSprintStatus}
+                >
+                  {tasks
+                    .filter((task) => task.idSprint === sprint.id)
+                    .map((task) => (
+                      <TaskChip
+                        key={task.id}
+                        task={task}
+                        isDropTarget={activeTaskId && activeTaskId === task.id}
+                      />
+                    ))}
+                </SprintColumn>
+              );
+            })}
+
 
             <button
-              onClick={handleAddSprint}
+              onClick={() => setIsCreateSprintModalOpen(true)}
               className="flex items-center gap-2 bg-[#2a2a2a] text-white px-4 py-2 rounded-full border border-neutral-600"
             >
               <Plus size={18} /> Create new sprint
@@ -335,6 +414,8 @@ const BacklogManager = () => {
                 nombre: "Backlog",
                 fechaInicio: "-",
                 fechaFin: "-",
+                completado: false,
+                deleted: false
               }}
             >
               {tasks
@@ -352,6 +433,18 @@ const BacklogManager = () => {
               </div>
             ) : null}
           </DragOverlay>
+
+          {isCreateSprintModalOpen && (
+            <CreateSprintModal
+              sprints={sprints}
+              onClose={() => setIsCreateSprintModalOpen(false)}
+              onSave={(newSprint) => {
+                handleAddSprint(newSprint);
+                setIsCreateSprintModalOpen(false);
+              }}
+            />
+          )}
+
         </DndContext>
       </div>
     </div>

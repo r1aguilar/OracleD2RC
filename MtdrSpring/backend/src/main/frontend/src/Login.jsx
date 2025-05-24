@@ -45,7 +45,7 @@ const LoginScreen = () => {
       
       console.log("📦 JSON recibido:", data);
       
-      if (!data.user.id_usuario || typeof data.user.manager === "undefined") {
+      if (!data.user.id || typeof data.user.manager === "undefined") {
         throw new Error("Datos incompletos del servidor");
       }
       

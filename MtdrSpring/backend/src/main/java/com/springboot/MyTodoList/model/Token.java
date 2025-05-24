@@ -8,12 +8,10 @@ import javax.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
 @Builder
 @AllArgsConstructor
-@NoArgsConstructor
 @Entity
 @Table(name = "TOKENS")
 public class Token {
@@ -31,4 +29,6 @@ public class Token {
     public void setToken(String token){
         this.token = token;
     }
+
+    Token(){}
 }

@@ -127,6 +127,17 @@ const DashDev = () => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
 
+  const formatToOffsetDateTime = (dateString) => {
+    const date = new Date(dateString);
+    const offset = -date.getTimezoneOffset();
+    const sign = offset >= 0 ? "+" : "-";
+    const pad = (n) => String(Math.floor(Math.abs(n))).padStart(2, "0");
+    const hours = pad(offset / 60);
+    const minutes = pad(offset % 60);
+    const localOffset = `${sign}${hours}:${minutes}`;
+    return `${dateString}T00:00:00${localOffset}`;
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -460,7 +471,7 @@ const DashDev = () => {
       }
     } else {
       const targetColumnId = columnMap[targetColumn];
-
+      
       setTasks(prev => ({
         ...prev,
         [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
@@ -468,7 +479,7 @@ const DashDev = () => {
           ...originalTask, 
           idColumna: targetColumnId,
           // Resetear horas reales si se mueve fuera de "done"
-          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0
+          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : null
         }]
       }));
       
@@ -478,7 +489,7 @@ const DashDev = () => {
         [targetColumn]: [...prev[targetColumn], { 
           ...originalTask, 
           idColumna: targetColumnId,
-          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0
+          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : null
         }]
       }));
 
@@ -544,12 +555,6 @@ const DashDev = () => {
         <header className="flex flex-wrap items-center justify-between py-4 gap-4">
           <h1 className="text-white text-2xl font-semibold">Dashboard</h1>
           <div className="flex flex-wrap gap-3 items-center">
-            <select className="bg-[#2a2a2a] text-white rounded px-4 py-2 text-sm">
-              <option>Select a Project</option>
-            </select>
-            <select className="bg-[#2a2a2a] text-white rounded px-4 py-2 text-sm">
-              <option>All Users</option>
-            </select>
             <Dropdown
               label="Sprints"
               options={sprints.map((sprint) => ({ 

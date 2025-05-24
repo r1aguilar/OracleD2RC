@@ -38,10 +38,10 @@ public class Tarea {
     @Column(name = "DESCRIPCION")
     String descripcion;
 
-    @Column(name = "FECHAINICIO", nullable = false)
+    @Column(name = "FECHAINICIO", nullable = true)
     OffsetDateTime fechaInicio;
 
-    @Column(name = "FECHAVENCIMIENTO", nullable = false)
+    @Column(name = "FECHAVENCIMIENTO", nullable = true)
     OffsetDateTime fechaVencimiento;
 
     @Column(name = "FECHACOMPLETADO")

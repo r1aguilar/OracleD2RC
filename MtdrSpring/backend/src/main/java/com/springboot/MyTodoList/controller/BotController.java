@@ -50,7 +50,7 @@ public class BotController extends TelegramLongPollingBot {
 	private IntegrantesEquipoService integrantesEquipoService;
 	private EquipoService equipoService;
 	private String botName;
-	private long userTelegramId; 
+	public long userTelegramId; 
 
 	// Mapa para manejar el estado del chat
 	private Map<Long, String> chatStateMap = new HashMap<>();
@@ -1452,7 +1452,7 @@ public class BotController extends TelegramLongPollingBot {
 		}
 	}
 
-	private void showManagerDeveloperTasks(long chatId, int idColumna, int idSprint, int idEncargado){
+	public void showManagerDeveloperTasks(long chatId, int idColumna, int idSprint, int idEncargado){
 		try {
 			List<Tarea> tasks = new ArrayList();
 			String typeTask = "";
@@ -2200,7 +2200,7 @@ public class BotController extends TelegramLongPollingBot {
 		}
 	}
 
-	private void viewListOfTasksKPIs(long chatId, int idColumna, int idSprint, int idEncargado){
+	public void viewListOfTasksKPIs(long chatId, int idColumna, int idSprint, int idEncargado){
 		try {
 			List<Tarea> tasks = new ArrayList();
 			String typeTask = "";
@@ -2829,7 +2829,7 @@ public class BotController extends TelegramLongPollingBot {
 		chatStateMap.put(chatId, state);
 	}
 
-	private void saveChatState(long chatId, String state, int tareaId) {
+	public void saveChatState(long chatId, String state, int tareaId) {
 		chatStateMap.put(chatId, state);
 		chatTareaIdMap.put(chatId, tareaId);
 	}

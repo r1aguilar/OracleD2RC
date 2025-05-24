@@ -1,8 +1,17 @@
 package com.springboot.MyTodoList.controller;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -17,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.springboot.MyTodoList.model.Sprints;
+import com.springboot.MyTodoList.model.Tarea;
 import com.springboot.MyTodoList.model.IntegrantesEquipo;
 
 import com.springboot.MyTodoList.service.SprintsService;
@@ -41,6 +51,8 @@ public class SprintsController {
     @Autowired
     private EquipoService equipoService;
 
+    private static final Logger logger = LoggerFactory.getLogger(TareaService.class);
+
     @GetMapping(value = "/Sprints")
     public List<Sprints> getAllSprints(){
         return sprintsService.findAll();
@@ -57,6 +69,58 @@ public class SprintsController {
     public List<Sprints> getAllSprintsForProject(@PathVariable int idProy) {
         return sprintsService.findAllSprintsFromProject(idProy);
     }
+
+    @PostMapping(value = "/CompleteSprint/{idSprint}")
+    public ResponseEntity completeSprint(@RequestBody Sprints sprint, @PathVariable int idSprint) {
+        try {
+            // Obtener la hora actual en UTC-6
+            OffsetDateTime nowUtcMinus6 = OffsetDateTime.now(ZoneOffset.ofHours(-6));
+
+            if (nowUtcMinus6.isBefore(sprint.getFechaFin())) {
+                return new ResponseEntity<>("El sprint aún no puede ser completado.", HttpStatus.BAD_REQUEST);
+            }
+
+            // Completar el sprint
+            sprintsService.updateSprints(idSprint, sprint);
+
+            // Buscar el siguiente sprint no completado del mismo proyecto
+            List<Sprints> sprints = sprintsService.findAllSprintsFromProject(sprint.getIdProyecto());
+            Optional<Sprints> siguienteSprint = sprints.stream()
+                    .filter(s -> !s.getCompletado() && s.getID() != idSprint)
+                    .sorted(Comparator.comparing(Sprints::getFechaInicio))
+                    .findFirst();
+
+
+            // Obtener las tareas del sprint actual
+            List<Tarea> tareas = tareaService.findAllTasksFromSprintForManager(idSprint);
+
+            // Filtrar tareas que no están completadas (columna != 3)
+            List<Tarea> tareasNoCompletadas = tareas.stream()
+                    .filter(t -> t.getIdColumna() != 3)
+                    .collect(Collectors.toList());
+
+            // Mover tareas
+            for (Tarea tarea : tareasNoCompletadas) {
+                if (siguienteSprint.isPresent()) {
+                    logger.debug(Integer.toString(siguienteSprint.get().getID()));
+                    tarea.setIdSprint(siguienteSprint.get().getID());
+                    tarea.setfechaInicio(siguienteSprint.get().getFechaInicio());
+                    tarea.setFechaVencimiento(siguienteSprint.get().getFechaFin());
+                } else {
+                    tarea.setIdSprint(null);
+                    tarea.setfechaInicio(null);
+                    tarea.setFechaVencimiento(null);
+                }
+                tareaService.updateTarea(tarea.getIdTarea(), tarea);
+            }
+
+            return new ResponseEntity<>(null, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
+    }
+
 
 
     @GetMapping(value = "/SprintsForKPIs/{idProy}")
