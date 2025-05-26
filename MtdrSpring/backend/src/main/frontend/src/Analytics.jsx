@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
 import { ResponsiveContainer, RadialBarChart, RadialBar, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Bell, UserCircle, Menu, CircleCheckBig, CalendarClock, ListChecks } from "lucide-react";
+import NotificationPanel from "./components/NotificationPanel";
+
 
 
 const AnalyticsManager = () => {
@@ -13,9 +15,7 @@ const AnalyticsManager = () => {
   const [sprints, setSprints] = useState([]);
   const [userTasks, setUserTasks] = useState([]);
   const [totalHoursBySprint, setTotalHoursBySprint] = useState([]);
-
-
-
+  const [showNotifications, setShowNotifications] = useState(false);
 
 
   const userMap = {
@@ -305,6 +305,11 @@ const totalWorkedHours = userTasks.reduce((sum, task) => sum + (task.realhours |
 
 const totalCompletedTasks = userTasks.filter(task => task.status === "Done").length;
 
+const toggleNotifications = () => {
+  setShowNotifications(prev => !prev);
+};
+
+
 
   return (
     <div className="flex h-screen bg-[#1a1a1a]">
@@ -324,11 +329,13 @@ const totalCompletedTasks = userTasks.filter(task => task.status === "Done").len
               ))}
             </select>
               <div className="flex items-center gap-3">
-                <Bell className="text-white cursor-pointer hover:text-red-500" />
-                <UserCircle className="text-white w-8 h-8 cursor-pointer hover:text-red-500" />
+                <NotificationPanel />
+                <UserCircle className="text-white w-8 h-8 me-6 cursor-pointer hover:text-red-500" />
               </div>
           </div>
         </header>
+
+
 
   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 ">
     <div className="bg-[#2a2a2a] rounded p-4">
