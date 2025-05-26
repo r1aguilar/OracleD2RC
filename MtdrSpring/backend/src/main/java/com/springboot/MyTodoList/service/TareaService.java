@@ -52,6 +52,11 @@ public class TareaService {
         return tareasAceptadasDelProyecto;
     }
 
+    public List<Tarea> findAllNotAcceptedTasksFromProject(int idProyecto){
+        List<Tarea> tareasAceptadasDelProyecto = tareaRepository.findByIdProyecto(idProyecto);
+        return tareasAceptadasDelProyecto;
+    }
+
     public List<Tarea> findAllTasksFromSprintForUserWithColumn(int idSprint, int idEncargado, int idColumna){
         List<Tarea> tareasAceptadasDelSprintDelUsuarioConColumna = tareaRepository.findByAceptadaAndIdSprintAndIdEncargadoAndIdColumna(1, idSprint, idEncargado, idColumna);
         return tareasAceptadasDelSprintDelUsuarioConColumna;

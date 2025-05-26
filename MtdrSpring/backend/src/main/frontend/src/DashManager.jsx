@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import Sidebar from "./components/Sidebar";
+import SidebarManager from "./components/SidebarManager";
 import Dropdown from "./components/DropDown";
+import AcceptTaskModal from "./components/AcceptTaskModal";
 import { ResponsiveContainer, RadialBarChart, RadialBar } from "recharts";
 import {
   DndContext,
@@ -21,7 +22,6 @@ import {
 import { SortableItem } from "./components/SortableItem";
 import { Bell, UserCircle, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import SidebarManager from "./components/SidebarManager";
 
 const tagColors = {
   High: "bg-red-600",
@@ -41,7 +41,6 @@ const columnNames = {
   3: "done",
 };
 
-// Create a separate droppable component for empty columns
 const EmptyDropArea = ({ columnId }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: columnId
@@ -57,7 +56,7 @@ const EmptyDropArea = ({ columnId }) => {
   );
 };
 
-const TaskList = ({ columnId, tasks }) => {
+const TaskList = ({ columnId, tasks, onTaskClick }) => {
   if (tasks.length === 0) {
     return <EmptyDropArea columnId={columnId} />;
   }
@@ -69,15 +68,25 @@ const TaskList = ({ columnId, tasks }) => {
     >
       {tasks.map((task) => (
         <SortableItem key={task.id} id={task.id}>
-          <div className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700">
+          <div 
+            className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 cursor-pointer hover:border-red-500 transition-colors"
+            onClick={() => onTaskClick(task)}
+          >
             <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
               {task.type}
             </span>
             <h3 className="font-semibold text-white mt-2">{task.title}</h3>
             <p className="text-sm text-gray-400">{task.description}</p>
-            <p className="text-xs text-gray-500 mt-2">
-              {new Date(task.fechaVencimiento).toLocaleDateString()}
-            </p>
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-xs text-gray-500">
+                {new Date(task.fechaVencimiento).toLocaleDateString()}
+              </p>
+              {task.idColumna === 3 && task.tiempoReal > 0 && (
+                <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
+                  {task.tiempoReal} hrs
+                </span>
+              )}
+            </div>
           </div>
         </SortableItem>
       ))}
@@ -88,9 +97,7 @@ const TaskList = ({ columnId, tasks }) => {
 const DroppableColumn = ({ id, title, tasksCount, children, isOver }) => {
   return (
     <section
-      className={`bg-[#2a2a2a] text-white rounded-lg p-4 flex flex-col ${
-        isOver ? "ring-2 ring-red-500 bg-[#3a3a3a]" : ""
-      }`}
+      className={`bg-[#2a2a2a] text-white rounded-lg p-4 flex flex-col ${isOver ? "ring-2 ring-red-500 bg-[#3a3a3a]" : ""}`}
       data-column-id={id}
     >
       <h2 className="text-lg font-semibold mb-2 capitalize">
@@ -119,16 +126,13 @@ const DashManager = () => {
   const [selectedSprints, setSelectedSprints] = useState(new Set());
   const [selectedProyecto, setSelectedProyecto] = useState(null);
   const [selectedIntegrante, setSelectedIntegrante] = useState(null);
-  // Debug state to track what's happening with sprint selection
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   const [debugSprintInfo, setDebugSprintInfo] = useState(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { 
-      activationConstraint: { distance: 8 } 
-    }),
-    useSensor(KeyboardSensor, { 
-      coordinateGetter: sortableKeyboardCoordinates 
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const fetchProyectos = useCallback(async () => {
@@ -138,22 +142,17 @@ const DashManager = () => {
       const res = await fetch(`/pruebasProy/ProyectosForManager/${userId}`);
       const data = await res.json();
       
-      // Ensure we get valid sprint data
       const validProys = data.filter(proy => 
         proy && proy.id !== undefined && proy.id !== null
       );
       
-      // Log valid sprints for debugging
       console.log("Fetched proyectos:", validProys);
-      
       setProyectos(validProys);
-      console.log(validProys[0].id)
-      setSelectedProyecto(validProys[0].id)
+      if (validProys.length > 0) {
+        setSelectedProyecto(validProys[0].id);
+      }
       
-      console.log("Initial selected proyecto IDs:", validProys[0].id);
-
-      return validProys[0].id;
-      
+      return validProys[0]?.id;
     } catch (err) {
       console.error("Failed to fetch proyectos", err);
     }
@@ -165,21 +164,17 @@ const DashManager = () => {
       const res = await fetch(`/pruebasProy/UsuariosProyecto/${proyectoId}`);
       const data = await res.json();
       
-      // Ensure we get valid sprint data
       const validUsers = data.filter(user => 
         user && user.id !== undefined && user.id !== null
       );
       
-      // Log valid sprints for debugging
       console.log("Fetched users:", validUsers);
-
       setIntegrantes(validUsers);
-      setSelectedIntegrante(null)
-      
+      setSelectedIntegrante(null);
     } catch (err) {
       console.error("Failed to fetch users", err);
     }
-  }, []);
+  }, [selectedProyecto]);
 
   const fetchTasks = useCallback(async (proyectoId = selectedProyecto) => {
     console.log("Tasks proyecto id", proyectoId);
@@ -199,7 +194,7 @@ const DashManager = () => {
           rawId: task.idTarea,
           idEncargado: task.idEncargado,
           idProyecto: task.idProyecto,
-          idColumna: task.idColumna, // Backend column ID
+          idColumna: task.idColumna,
           idSprint: task.idSprint,
           title: task.nombre,
           description: task.descripcion,
@@ -207,10 +202,10 @@ const DashManager = () => {
           fechaVencimiento: task.fechaVencimiento,
           fechaCompletado: task.fechaCompletado,
           storyPoints: task.storyPoints,
-          tiempoReal: task.tiempoReal,
+          tiempoReal: task.tiempoReal || 0,
           tiempoEstimado: task.tiempoEstimado,
           prioridad: task.prioridad,
-          aceptada: 1,
+          aceptada: task.aceptada || 1,
           type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
         };
         const column = columnNames[task.idColumna];
@@ -221,7 +216,7 @@ const DashManager = () => {
       });
 
       setTasks(newTasks);
-      setAllTasks(newTasks);  // Save full list
+      setAllTasks(newTasks);
       setOriginalTaskLocations(newOriginalLocations);
     } catch (err) {
       console.error(err);
@@ -229,7 +224,7 @@ const DashManager = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [navigate]);
+  }, [navigate, selectedProyecto]); 
 
   const fetchSprints = useCallback(async (proyectoId = selectedProyecto) => {
     if (!proyectoId) return;
@@ -238,37 +233,32 @@ const DashManager = () => {
       const res = await fetch(`/pruebasSprint/SprintsForProject/${proyectoId}`);
       const data = await res.json();
       
-      // Ensure we get valid sprint data
       const validSprints = data.filter(sprint => 
         sprint && sprint.id !== undefined && sprint.id !== null
       );
       
-      // Log valid sprints for debugging
       console.log("Fetched sprints:", validSprints);
-      
       setSprints(validSprints);
       
-      // Initialize all sprints as selected, using Number() to ensure IDs are numeric
       const initialSelectedSprints = new Set(
         validSprints
           .map(sprint => Number(sprint.id))
-          .filter(id => !isNaN(id)) // Filter out any NaN values
+          .filter(id => !isNaN(id))
       );
       
       setSelectedSprints(initialSelectedSprints);
       console.log("Initial selected sprint IDs:", Array.from(initialSelectedSprints));
-      
     } catch (err) {
       console.error("Failed to fetch sprints", err);
     }
-  }, []);
+  }, [selectedProyecto]);
 
   useEffect(() => {
-  const init = async () => {
-    const proyectoId = await fetchProyectos();
-  };
-  init();
-}, []);
+    const init = async () => {
+      const proyectoId = await fetchProyectos();
+    };
+    init();
+  }, [fetchProyectos]);
 
   useEffect(() => {
     if (selectedProyecto) {
@@ -276,69 +266,52 @@ const DashManager = () => {
       fetchSprints(selectedProyecto);
       fetchIntegrantes(selectedProyecto);
     }
-  }, [selectedProyecto]);
-
+  }, [selectedProyecto, fetchTasks, fetchSprints, fetchIntegrantes]);
 
   useEffect(() => {
-  console.log("Selected sprints:", Array.from(selectedSprints));
-  console.log("Selected integrante:", selectedIntegrante);
-  console.log("All tasks:", allTasks);
+    console.log("Selected sprints:", Array.from(selectedSprints));
+    console.log("Selected integrante:", selectedIntegrante);
+    console.log("All tasks:", allTasks);
 
-  if (selectedSprints.size === 0) {
-    setTasks({
-      pending: [],
-      doing: [],
-      done: [],
-    });
-    return;
-  }
+    if (selectedSprints.size === 0) {
+      setTasks({
+        pending: [],
+        doing: [],
+        done: [],
+      });
+      return;
+    }
 
-  const sprintTaskCounts = {};
-  const filtered = Object.fromEntries(
-    Object.entries(allTasks).map(([columnKey, columnTasks]) => [
-      columnKey,
-      columnTasks.filter((task) => {
-        const sprintId = Number(task.idSprint);
-        const encargadoId = task.idEncargado;
+    const filtered = Object.fromEntries(
+      Object.entries(allTasks).map(([columnKey, columnTasks]) => [
+        columnKey,
+        columnTasks.filter((task) => {
+          const sprintId = Number(task.idSprint);
+          const encargadoId = task.idEncargado;
 
-        if (isNaN(sprintId) || !selectedSprints.has(sprintId)) {
-          return false;
-        }
+          if (isNaN(sprintId) || !selectedSprints.has(sprintId)) {
+            return false;
+          }
 
-        // If selectedIntegrante is null or empty string, show all
-        if (!selectedIntegrante || selectedIntegrante === "null") {
-          return true;
-        }
+          if (!selectedIntegrante || selectedIntegrante === "null") {
+            return true;
+          }
 
-        return String(encargadoId) === String(selectedIntegrante);
-      }),
-    ])
-  );
+          return String(encargadoId) === String(selectedIntegrante);
+        }),
+      ])
+    );
 
-  Object.values(allTasks).forEach((columnTasks) => {
-    columnTasks.forEach((task) => {
-      const sid = Number(task.idSprint);
-      if (!isNaN(sid)) {
-        sprintTaskCounts[sid] = (sprintTaskCounts[sid] || 0) + 1;
-      }
-    });
-  });
-
-  setTasks(filtered);
-  setDebugSprintInfo({
+    setTasks(filtered);
+    setDebugSprintInfo({
       selectedSprints: Array.from(selectedSprints),
       filteredTaskCount: Object.values(filtered).flat().length,
       allTasksCount: Object.values(allTasks).flat().length,
     });
   }, [selectedSprints, allTasks, selectedIntegrante]);
 
-
-  // Function to handle sprint selection/deselection
   const handleSprintToggle = (sprintId, isChecked) => {
-    // Ensure sprintId is a number
     const numericSprintId = Number(sprintId);
-    
-    // Check if it's a valid number
     if (isNaN(numericSprintId)) {
       console.error("Invalid sprint ID received:", sprintId);
       return;
@@ -358,7 +331,108 @@ const DashManager = () => {
     });
   };
 
-  // Completely avoiding the use of findColumn() during drag end since it's causing issues
+  const handleTaskClick = (task) => {
+    setSelectedTask(task);
+    setShowTaskModal(true);
+  };
+
+  const updateTaskState = (state, updatedTask) => {
+    const newState = { ...state };
+    Object.keys(newState).forEach(col => {
+      newState[col] = newState[col].map(t => 
+        t.id === updatedTask.id ? updatedTask : t
+      );
+    });
+    return newState;
+  };
+
+  const handleSaveTask = async (updatedTask) => {
+    try {
+      // Validate sprint
+      const taskSprint = sprints.find(s => Number(s.id) === Number(updatedTask.idSprint));
+      if (taskSprint) {
+        const dueDate = new Date(updatedTask.fechaVencimiento);
+        const startDate = new Date(taskSprint.fechaInicio);
+        const endDate = new Date(taskSprint.fechaFin);
+        
+        if (dueDate < startDate || dueDate > endDate) {
+          throw new Error(`La fecha debe estar entre ${startDate.toLocaleDateString()} y ${endDate.toLocaleDateString()}`);
+        }
+      }
+
+      // Validate estimated hours
+      const horasEstimadas = parseInt(updatedTask.tiempoEstimado);
+      if (isNaN(horasEstimadas) || horasEstimadas < 0) {
+        throw new Error("El tiempo estimado debe ser un número entero positivo");
+      }
+
+      // Ensure numeric fields
+      const prioridad = Number(updatedTask.prioridad) || 1;
+      const tiempoReal = updatedTask.idColumna === 3 ? 
+        (Number(updatedTask.tiempoReal) || 0) : 
+        (updatedTask.tiempoReal || 0);
+
+      const payload = {
+        idTarea: updatedTask.rawId,
+        idEncargado: updatedTask.idEncargado,
+        idProyecto: updatedTask.idProyecto,
+        idColumna: updatedTask.idColumna,
+        idSprint: updatedTask.idSprint,
+        nombre: updatedTask.title,
+        descripcion: updatedTask.description,
+        prioridad: prioridad,
+        fechaInicio: updatedTask.fechaInicio,
+        fechaVencimiento: updatedTask.fechaVencimiento,
+        ...(updatedTask.fechaCompletado && { 
+          fechaCompletado: updatedTask.fechaCompletado 
+        }),
+        storyPoints: updatedTask.storyPoints,
+        tiempoReal: tiempoReal,
+        tiempoEstimado: horasEstimadas,
+        aceptada: updatedTask.aceptada !== undefined ? updatedTask.aceptada : 1,
+      };
+
+      console.log("Enviando datos al servidor:", payload);
+
+      const response = await fetch(`/pruebas/updateTarea/${updatedTask.rawId}`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token") || ''}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Error ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      
+      const updatedTaskData = {
+        ...updatedTask,
+        prioridad: responseData.prioridad || prioridad,
+        tiempoReal: responseData.tiempoReal || tiempoReal,
+        tiempoEstimado: responseData.tiempoEstimado || horasEstimadas,
+        fechaVencimiento: responseData.fechaVencimiento || updatedTask.fechaVencimiento,
+        fechaInicio: responseData.fechaInicio || updatedTask.fechaInicio,
+        idEncargado: responseData.idEncargado || updatedTask.idEncargado,
+        idSprint: responseData.idSprint || updatedTask.idSprint,
+        title: responseData.nombre || updatedTask.title,
+        description: responseData.descripcion || updatedTask.description
+      };
+
+      setTasks(prev => updateTaskState(prev, updatedTaskData));
+      setAllTasks(prev => updateTaskState(prev, updatedTaskData));
+
+      return responseData;
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      throw error;
+    }
+  };
+
   const findColumn = (itemId) => {
     if (itemId === "pending" || itemId === "doing" || itemId === "done") {
       return itemId;
@@ -371,6 +445,169 @@ const DashManager = () => {
     }
     
     return null;
+  };
+
+  const handleDragStart = ({ active }) => {
+    const column = findColumn(active.id);
+    if (!column) return;
+    
+    const task = tasks[column].find((t) => t.id === active.id);
+    setActiveId(active.id);
+    setActiveTask(task || null);
+    
+    setOriginalTaskLocations(prev => ({
+      ...prev,
+      [active.id]: column
+    }));
+  };
+
+  const handleDragOver = ({ active, over }) => {
+    if (!active || !over) {
+      setOverColumnId(null);
+      return;
+    }
+    
+    const overColumn = ["pending", "doing", "done"].includes(over.id) 
+      ? over.id 
+      : findColumn(over.id);
+    
+    setOverColumnId(overColumn);
+    
+    const activeColumn = findColumn(active.id);
+    
+    if (!activeColumn || !overColumn || activeColumn === overColumn) return;
+    
+    setTasks(prevTasks => {
+      const activeItems = [...prevTasks[activeColumn]];
+      const overItems = [...prevTasks[overColumn]];
+      
+      const activeIndex = activeItems.findIndex(item => item.id === active.id);
+      if (activeIndex === -1) return prevTasks;
+      
+      const taskToMove = { ...activeItems[activeIndex] };
+      
+      return {
+        ...prevTasks,
+        [activeColumn]: activeItems.filter(item => item.id !== active.id),
+        [overColumn]: [...overItems, taskToMove]
+      };
+    });
+  };
+
+  const handleDragEnd = async ({ active, over }) => {
+    setOverColumnId(null);
+
+    if (!active || !over) {
+      setActiveId(null);
+      setActiveTask(null);
+      return;
+    }
+
+    const sourceColumn = originalTaskLocations[active.id];
+    let targetColumn = null;
+
+    if (["pending", "doing", "done"].includes(over.id)) {
+      targetColumn = over.id;
+    } else {
+      for (const col of ["pending", "doing", "done"]) {
+        if (tasks[col].some(task => task.id === over.id)) {
+          targetColumn = col;
+          break;
+        }
+      }
+    }
+
+    if (!sourceColumn || !targetColumn) {
+      console.error("Source or target column not found");
+      setActiveId(null);
+      setActiveTask(null);
+      return;
+    }
+
+    if (sourceColumn === targetColumn) {
+      if (over.id !== targetColumn) {
+        const activeIndex = tasks[sourceColumn].findIndex(task => task.id === active.id);
+        const overIndex = tasks[targetColumn].findIndex(task => task.id === over.id);
+        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+          setTasks(prev => ({
+            ...prev,
+            [sourceColumn]: arrayMove(prev[sourceColumn], activeIndex, overIndex),
+          }));
+        }
+      }
+    } else {
+      const originalTask = tasks[sourceColumn]?.find(task => task.id === active.id) || activeTask;
+      if (!originalTask) {
+        console.error("Original task not found:", active.id);
+        setActiveId(null);
+        setActiveTask(null);
+        return;
+      }
+
+      const targetColumnId = columnMap[targetColumn];
+
+      setTasks(prev => ({
+        ...prev,
+        [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
+        [targetColumn]: [...prev[targetColumn], { 
+          ...originalTask, 
+          idColumna: targetColumnId,
+          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0
+        }]
+      }));
+      
+      setAllTasks(prev => ({
+        ...prev,
+        [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
+        [targetColumn]: [...prev[targetColumn], { 
+          ...originalTask, 
+          idColumna: targetColumnId,
+          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0
+        }]
+      }));
+
+      setOriginalTaskLocations(prev => ({
+        ...prev,
+        [active.id]: targetColumn,
+      }));
+
+      try {
+        const response = await fetch(`/pruebas/updateTarea/${originalTask.rawId}`, {
+          method: "PUT",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("token") || ''}`
+          },
+          body: JSON.stringify({
+            idTarea: originalTask.rawId,
+            idEncargado: originalTask.idEncargado,
+            idProyecto: originalTask.idProyecto,
+            idColumna: targetColumnId,
+            idSprint: originalTask.idSprint,
+            nombre: originalTask.title,
+            descripcion: originalTask.description,
+            prioridad: originalTask.prioridad,
+            fechaInicio: originalTask.fechaInicio,
+            fechaVencimiento: originalTask.fechaVencimiento,
+            fechaCompletado: originalTask.fechaCompletado,
+            storyPoints: originalTask.storyPoints,
+            tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0,
+            tiempoEstimado: originalTask.tiempoEstimado,
+            aceptada: originalTask.aceptada,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+      } catch (error) {
+        console.error("Failed to update task:", error);
+        fetchTasks();
+      }
+    }
+
+    setActiveId(null);
+    setActiveTask(null);
   };
 
   const progress =
@@ -393,7 +630,7 @@ const DashManager = () => {
           <div className="flex flex-wrap gap-3 items-center">
             <select
               className="bg-[#2a2a2a] text-white rounded px-4 py-2 text-sm"
-              value={selectedProyecto}
+              value={selectedProyecto || ''}
               onChange={(e) => setSelectedProyecto(e.target.value)}
             >
               <option value="">Select a Project</option>
@@ -405,7 +642,7 @@ const DashManager = () => {
             </select>
             <select
               className="bg-[#2a2a2a] text-white rounded px-4 py-2 text-sm"
-              value={selectedIntegrante}
+              value={selectedIntegrante || ''}
               onChange={(e) => setSelectedIntegrante(e.target.value)}
             >
               <option value="">All Users</option>
@@ -418,14 +655,13 @@ const DashManager = () => {
             <Dropdown
               label="Sprints"
               options={sprints.map((sprint) => ({ 
-                id: Number(sprint.id), // Ensure numeric IDs
-                name: sprint.nombre || `Sprint ${sprint.id}` // Fallback name if none exists
+                id: Number(sprint.id),
+                name: sprint.nombre || `Sprint ${sprint.id}`
               }))}
               onSelect={handleSprintToggle}
               initialChecked={true}
             />
             
-            {/* Debug info - remove in production */}
             {debugSprintInfo && (
               <div className="fixed bottom-4 right-4 bg-black/80 text-white p-2 rounded text-xs max-w-xs z-50">
                 <div>Selected: {debugSprintInfo.selectedSprints.join(', ')}</div>
@@ -442,11 +678,7 @@ const DashManager = () => {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          measuring={{
-            droppable: {
-              strategy: 'always'
-            }
-          }}
+          measuring={{ droppable: { strategy: 'always' } }}
         >
           <main className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {Object.entries(tasks).map(([columnId, columnTasks]) => (
@@ -460,6 +692,7 @@ const DashManager = () => {
                 <TaskList
                   columnId={columnId}
                   tasks={columnTasks}
+                  onTaskClick={handleTaskClick}
                 />
               </DroppableColumn>
             ))}
@@ -500,6 +733,16 @@ const DashManager = () => {
             )}
           </DragOverlay>
         </DndContext>
+
+        {showTaskModal && (
+          <AcceptTaskModal
+            task={selectedTask}
+            sprints={sprints}
+            integrantes={integrantes}
+            onClose={() => setShowTaskModal(false)}
+            onSave={handleSaveTask}
+          />
+        )}
       </div>
     </div>
   );
