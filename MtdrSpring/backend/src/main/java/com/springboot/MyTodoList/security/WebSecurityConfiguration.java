@@ -45,7 +45,9 @@ public class WebSecurityConfiguration {
                     new AntPathRequestMatcher("/registro"),
                     new AntPathRequestMatcher("/login"),
                     new AntPathRequestMatcher("/backlogMan"),
-                    new AntPathRequestMatcher("/dashManager")
+                    new AntPathRequestMatcher("/dashManager"),
+                    new AntPathRequestMatcher("/analyticssprint")
+
                 ).permitAll()
                 .anyRequest().authenticated()
             .and()

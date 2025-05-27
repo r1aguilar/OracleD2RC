@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./components/SidebarManager";
 import { ResponsiveContainer, RadialBarChart, RadialBar, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Bell, UserCircle, Menu, CircleCheckBig, CalendarClock, ListChecks } from "lucide-react";
 import NotificationPanel from "./components/NotificationPanel";
