@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "./components/SortableItem";
-import { Bell, UserCircle, Menu } from "lucide-react";
+import { Bell, UserCircle, Menu, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const tagColors = {
@@ -62,37 +62,49 @@ const TaskList = ({ columnId, tasks, onTaskClick }) => {
   }
 
   return (
-    <SortableContext 
+    <SortableContext
       items={tasks.map(t => t.id)}
       strategy={verticalListSortingStrategy}
     >
-      {tasks.map((task) => (
-        <SortableItem key={task.id} id={task.id}>
-          <div 
-            className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 cursor-pointer hover:border-red-500 transition-colors"
-            onClick={() => onTaskClick(task)}
-          >
-            <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
-              {task.type}
-            </span>
-            <h3 className="font-semibold text-white mt-2">{task.title}</h3>
-            <p className="text-sm text-gray-400">{task.description}</p>
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-xs text-gray-500">
-                {new Date(task.fechaVencimiento).toLocaleDateString()}
-              </p>
-              {task.idColumna === 3 && task.tiempoReal > 0 && (
-                <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
-                  {task.tiempoReal} hrs
-                </span>
-              )}
+      {tasks.map((task) => {
+        const isExpired = new Date(task.fechaVencimiento) < new Date();
+
+        return (
+          <SortableItem key={task.id} id={task.id}>
+            <div
+              className={`bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 transition-colors ${isExpired ? 'opacity-70' : 'cursor-pointer hover:border-red-500'}`}
+              onClick={() => !isExpired && onTaskClick(task)}
+            >
+              <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
+                {task.type}
+              </span>
+              <h3 className="font-semibold text-white mt-2">{task.title}</h3>
+              <p className="text-sm text-gray-400">{task.description}</p>
+              <div className="flex justify-between items-center mt-2">
+                <p className="text-xs text-gray-500">
+                  {new Date(task.fechaVencimiento).toLocaleDateString()}
+                </p>
+                <div className="flex items-center gap-2">
+                  {task.idColumna === 3 && task.tiempoReal > 0 && (
+                    <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
+                      {task.tiempoReal} hrs
+                    </span>
+                  )}
+                  {isExpired && (
+                    <span className="text-xs text-gray-400" title="Tarea vencida">
+                      <Lock className="text-white"></Lock>
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        </SortableItem>
-      ))}
+          </SortableItem>
+        );
+      })}
     </SortableContext>
   );
 };
+
 
 const DroppableColumn = ({ id, title, tasksCount, children, isOver }) => {
   return (
@@ -616,6 +628,8 @@ const DashManager = () => {
       : 0;
 
   if (isLoading) return <div className="text-white text-center mt-10">Cargando tareas...</div>;
+
+
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-[#1a1a1a]">
