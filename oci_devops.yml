@@ -2,7 +2,7 @@ version: 0.1
 component: build
 timeoutInSeconds: 600
 shell: bash
-
+#ola
 env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
