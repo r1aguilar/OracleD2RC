@@ -28,12 +28,19 @@ steps:
       source env.sh
       echo "e6k)8n.:E6y[#L{5()jm" | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
 
-
   - type: Command
     name: "Build"
-    command:  cd MtdrSpring;
-              source env.sh;
-              (cd backend;source build.sh)
+    command: |
+      cd MtdrSpring
+      source env.sh
+      (cd backend; source build.sh)
 
+  - type: Command
+    name: "Guardar metadata del Docker image como artifact"
+    command: |
+      mkdir -p artifacts
+      echo "$DOCKER_IMAGE" > artifacts/image.txt
 
-
+outputArtifacts:
+  - name: deploymentArtifact
+    path: artifacts
