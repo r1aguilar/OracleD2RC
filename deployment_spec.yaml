@@ -1,0 +1,14 @@
+version: 0.1
+component: deploy
+timeoutInSeconds: 600
+shell: bash
+
+steps:
+  - type: Command
+    name: "Desplegar contenedor Docker desde artifact"
+    command: |
+      IMAGE=$(cat deploymentArtifact/image.txt)
+      echo "Usando imagen: $IMAGE"
+      docker pull $IMAGE
+      docker rm -f mtdr-spring || true
+      docker run -d --name mtdr-spring -p 8080:8080 $IMAGE
