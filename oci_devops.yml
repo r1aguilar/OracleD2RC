@@ -1,77 +1,44 @@
 version: 0.1
 component: build
-timeoutInSeconds: 600
+timeoutInSeconds: 1800        # 30 min
 shell: bash
-
-env:
-  variables:
-    JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
-  exportedVariables:
-    - BuildServiceDemoVersion
+failImmediatelyOnError: true  # corta el pipeline en el primer error
 
 steps:
-  # --------------------------------------------------------------------------
+  # 1. Instalar el plugin Native Image en la GraalVM que ya trae el runner
   - type: Command
-    name: "Install GraalVM Enterprise 22.x Native Image for Java17"
-    runAs: root
+    name: "Instalar GraalVM Native Image"
     command: |
       yum -y install graalvm22-ee-17-native-image
 
+  # 2. Iniciar sesión en tu repositorio de Oracle Container Registry (OCIR)
   - type: Command
-    name: "Set PATH Variable"
+    name: "Docker Login (hard-coded)"
     command: |
-      export PATH=$JAVA_HOME/bin:$PATH
-
-  # --------------------------------------------------------------------------
-  - type: Command
-    name: "Docker Login (credenciales axgw2tdpave8)"
-    command: |
-      cd MtdrSpring
-      oci os object get \
-        --bucket-name reacttodo-rolax \
-        --name deployment_config.tgz \
-        --file deployment_config.tgz
-      tar -xzvf deployment_config.tgz
-      source env.sh
-      docker login \
+      docker login mx-queretaro-1.ocir.io \
         -u "axgw2tdpave8/a01285921@tec.mx" \
-        -p "e6k)8n.:E6y[#L{5()jm" \
-        mx-queretaro-1.ocir.io || exit 1
+        -p 'e6k)8n.:E6y[#L{5()jm'
 
-  # --------------------------------------------------------------------------
+  # 3. Compilar la aplicación Spring Boot (salta tests para acelerar)
   - type: Command
-    name: "Build"
-    failImmediatelyOnError: true
+    name: "Compilar Spring Boot"
     command: |
-      cd MtdrSpring
-      source env.sh
-      (cd backend && source build.sh)
+      ./mvnw -B clean package -DskipTests
 
-  # --------------------------------------------------------------------------
+  # 4. Construir la imagen Docker
   - type: Command
-    name: "Install K8s"
+    name: "Construir imagen Docker"
     command: |
-      mkdir -p $HOME/k8s $HOME/.kube
-      curl -L -o $HOME/k8s/kubectl https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl
-      chmod +x $HOME/k8s/kubectl
-      export PATH=$PATH:$HOME/k8s
-      kubectl version --client
+      docker build -t mx-queretaro-1.ocir.io/axgw2tdpave8/mtdrspring:latest .
 
-      oci ce cluster create-kubeconfig \
-        --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaasajbmfcpyzvx6rmvk6rf5mumkqc7tdilav7gtd57ac73xtlczuyq \
-        --file $HOME/.kube/config \
-        --region mx-queretaro-1 \
-        --token-version 2.0.0 \
-        --kube-endpoint PUBLIC_ENDPOINT
-      export KUBECONFIG=$HOME/.kube/config
-
-  # --------------------------------------------------------------------------
+  # 5. Publicar la imagen en OCIR
   - type: Command
-    name: "Undeploy"
+    name: "Push de imagen Docker"
     command: |
-      export PATH=$PATH:$HOME/k8s
-      export KUBECONFIG=$HOME/.kube/config
-      cd MtdrSpring/backend
-      source ../env.sh
-      kubectl config view
-      source undeploy.sh
+      docker push mx-queretaro-1.ocir.io/axgw2tdpave8/mtdrspring:latest
+
+# 6. Registrar la imagen como artefacto de salida para el Deploy Pipeline
+outputArtifacts:
+  - name: mtdrspring_image
+    type: DOCKER_IMAGE
+    location: mx-queretaro-1.ocir.io/axgw2tdpave8/mtdrspring:latest
