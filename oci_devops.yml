@@ -28,4 +28,4 @@ steps:
 outputArtifacts:
   - name: deploymentArtifact
     type: BINARY
-    location: image.txt
+    location: output
