@@ -1,117 +1,64 @@
-# build_spec.yml  — CI/CD completo en un solo archivo
 version: 0.1
 component: build
-timeoutInSeconds: 1800          # 30 min para dar margen a las pruebas
-runAs: root                      # Necesario para instalar paquetes
+timeoutInSeconds: 600
 shell: bash
 
-############################################################
-# 1. VARIABLES DE ENTORNO
-############################################################
 env:
   variables:
-    # GraalVM
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
 
-    # Repositorio de contenedores OCIR
-    DOCKER_OCIR: mx-queretaro-1.ocir.io
-    OCIR_USER: "axgw2tdpave8/a01285921@tec.mx"
-    OCIR_PASS: 'e6k)8n.:E6y[#L{5()jm'
-
-    # Nombre y versión de la imagen
-    IMAGE_NAME: mtdrspring
-    IMAGE_VERSION: "${BUILD_RUN_HASH}"   # hash automático de la ejecución
-
-    # Kubeconfig ya configurado como variable segura en el proyecto
-    KUBECONFIG: /home/opc/.kube/config
-
   exportedVariables:
-    - IMAGE_VERSION                  # útil para notificaciones, etc.
+    - BuildServiceDemoVersion
 
-############################################################
-# 2. PASOS DEL PIPELINE
-############################################################
 steps:
-  ##########################################################################
-  # 2.1 Dependencias y entorno
-  ##########################################################################
   - type: Command
-    name: "Instalar GraalVM Native Image Java 17"
-    command: |
-      yum -y install graalvm22-ee-17-native-image
+    name: "Install GraalVM Enterprise 22.x Native Image for Java17"
+    command: yum -y install graalvm22-ee-17-native-image
 
   - type: Command
-    name: "Actualizar PATH"
-    command: |
-      export PATH=$JAVA_HOME/bin:$PATH
+    name: "Set PATH Variable"
+    command: export PATH=$JAVA_HOME/bin:$PATH
 
   - type: Command
-    name: "Docker Login a OCIR"
-    command: |
-      echo "${OCIR_PASS}" | docker login ${DOCKER_OCIR} \
-        -u "${OCIR_USER}" --password-stdin
+    name: "Docker Login"
+    command:  cd MtdrSpring;
+              oci os object get --bucket-name reacttodo-crj8s --name deployment_config.tgz --file deployment_config.tgz;
+              tar -xzvf deployment_config.tgz;
+              source env.sh;
+              cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
 
-  ##########################################################################
-  # 2.2 Build del backend y del contenedor
-  ##########################################################################
-  - type: Command
-    name: "Compilar Spring Boot (JAR)"
-    command: |
-      cd MtdrSpring/backend
-      ./mvnw -B clean package -DskipTests
-      cd ../..
 
   - type: Command
-    name: "Construir y Push Docker Image"
-    command: |
-      cd MtdrSpring
-      docker build -t ${DOCKER_OCIR}/${OCIR_USER%%/*}/${IMAGE_NAME}:${IMAGE_VERSION} -f Dockerfile .
-      docker push ${DOCKER_OCIR}/${OCIR_USER%%/*}/${IMAGE_NAME}:${IMAGE_VERSION}
-
-  ##########################################################################
-  # 2.3 Pruebas automáticas
-  ##########################################################################
-  - type: Command
-    name: "Pruebas JUnit + Selenium"
-    command: |
-      cd MtdrSpring/backend
-      ./mvnw test                              # asumiendo tests Selenium en src/test
-      cd ../..
+    name: "Build"
+    failInmediatelyOnError: true
+    command: cd MtdrSpring;
+      source env.sh;
+      (cd backend;source build.sh)
 
   - type: Command
-    name: "Pruebas de Carga (JMeter)"
-    command: |
-      jmeter -n \
-        -t ci/tests/performance.jmx \
-        -l ci/reports/jmeter_${IMAGE_VERSION}.jtl
+    name: "Install K8s"
+    command: mkdir -p $HOME/.kube;
+      cd $HOME;
+      ls -la;
+      mkdir k8s;
+      ls -la;
+      cd k8s;
+      wget https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl;
+      ls -la;
+      chmod +x kubectl;
+      export PATH=$PATH:$HOME/k8s;
+      kubectl version --client;
+      cd ..;
+      cd .kube;
+      oci ce cluster create-kubeconfig --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaaj4geigf35a5xkwdkizx3ypfrnkipq6hjmplkwuxbnczi5nt6e4oa --file $HOME/.kube/config --region mx-queretaro-1 --token-version 2.0.0  --kube-endpoint PUBLIC_ENDPOINT      export KUBECONFIG=$HOME/.kube/config;
 
   - type: Command
-    name: "Pruebas de Seguridad (OWASP ZAP)"
-    command: |
-      zap.sh -daemon \
-        -config api.disablekey=true \
-        -quickurl http://localhost:8080 \
-        -quickout ci/reports/zap_${IMAGE_VERSION}.html
-
-  ##########################################################################
-  # 2.4 Despliegue in-place a producción (OKE)
-  ##########################################################################
-  - type: Command
-    name: "Despliegue rolling update en OKE"
-    command: |
-      # Usa el archivo kubeconfig cargado como variable de entorno segura
-      kubectl set image deployment/mtdrspring mtdrspring=${DOCKER_OCIR}/${OCIR_USER%%/*}/${IMAGE_NAME}:${IMAGE_VERSION} --record
-      kubectl rollout status deployment/mtdrspring
-
-  ##########################################################################
-  # 2.5 (Opcional) Publicar reportes como artefacto
-  ##########################################################################
-  - type: Command
-    name: "Empaquetar reportes de pruebas"
-    command: |
-      tar -czf test_reports_${IMAGE_VERSION}.tgz ci/reports
-    outputs:
-      - name: test-reports
-        type: FILE
-        files:
-          - "test_reports_${IMAGE_VERSION}.tgz"
+    name: "Undeploy"
+    command: export PATH=$PATH:$HOME/k8s;kubectl version;
+      export KUBECONFIG=$HOME/.kube/config;
+      cd MtdrSpring;
+      source env.sh;
+      cd backend;
+      ls -l;
+      kubectl config view;
+      source undeploy.sh;
