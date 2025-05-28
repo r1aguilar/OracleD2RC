@@ -43,3 +43,6 @@ steps:
 
 outputArtifacts:
   - name: deploymentArtifact
+    type: local
+    location: artifacts
+
