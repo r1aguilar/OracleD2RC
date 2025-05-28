@@ -5,10 +5,9 @@ shell: bash
 
 steps:
   - type: Command
-    name: "Desplegar contenedor Docker desde artifact"
+    name: "Desplegar imagen usando parámetro"
     command: |
-      IMAGE=$(cat deploymentArtifact/image.txt)
-      echo "Usando imagen: $IMAGE"
-      docker pull $IMAGE
+      echo "Usando imagen: ${buildpipeline.IMAGE_NAME}"
       docker rm -f mtdr-spring || true
-      docker run -d --name mtdr-spring -p 8080:8080 $IMAGE
+      docker pull ${buildpipeline.IMAGE_NAME}
+      docker run -d --name mtdr-spring -p 8080:8080 ${buildpipeline.IMAGE_NAME}
