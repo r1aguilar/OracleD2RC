@@ -1,6 +1,6 @@
 version: 0.1
 component: build
-timeoutInSeconds: 600
+timeoutInSeconds: 900
 shell: bash
 
 env:
@@ -10,22 +10,17 @@ env:
 steps:
   - type: Command
     name: "Instalar GraalVM Native Image"
-    command: |
-      yum -y install graalvm22-ee-17-native-image
+    command: yum -y install graalvm22-ee-17-native-image
 
   - type: Command
-    name: "Login en Docker y Construcción de Imagen"
+    name: "Simulación de build y push Docker"
     command: |
       export PATH=$JAVA_HOME/bin:$PATH
-      cd MtdrSpring
-      oci os object get --bucket-name reacttodo-rolax --name deployment_config.tgz --file deployment_config.tgz
-      tar -xzvf deployment_config.tgz
-      source env.sh
-      echo "e6k)8n.:E6y[#L{5()jm" | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
-      (cd backend && source build.sh)
-      echo $DOCKER_IMAGE > image.txt
+      echo "Simulando creación de imagen Docker..."
+      IMAGE="mx-queretaro-1.ocir.io/tu_namespace/mtdr-spring:auto$(date +%s)"
+      echo "##IMAGE_NAME=$IMAGE" >> $OCI_OUTPUT_DIR/output_params
+      echo "Imagen simulada: $IMAGE"
 
-outputArtifacts:
-  - name: deploymentArtifact
-    type: BINARY
-    location: output
+outputParameters:
+  - name: IMAGE_NAME
+    type: STRING
