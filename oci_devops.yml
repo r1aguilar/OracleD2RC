@@ -7,9 +7,6 @@ env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
 
-  exportedVariables:
-    - BuildServiceDemoVersion
-
 steps:
   - type: Command
     name: "Install GraalVM Enterprise 22.x Native Image for Java17"
@@ -35,14 +32,6 @@ steps:
       source env.sh
       (cd backend; source build.sh)
 
-  - type: Command
-    name: "Guardar metadata del Docker image como artifact"
-    command: |
-      mkdir -p artifacts
-      echo "$DOCKER_IMAGE" > artifacts/image.txt
-
-outputArtifacts:
-  - name: deploymentArtifact
-    type: local
-    location: artifacts
-
+outputParameters:
+  - name: dockerImage
+    value: $DOCKER_IMAGE
