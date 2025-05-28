@@ -21,11 +21,13 @@ steps:
 
   - type: Command
     name: "Docker Login"
-    command:  cd MtdrSpring;
-              oci os object get --bucket-name reacttodo-rolax --name deployment_config.tgz --file deployment_config.tgz;
-              tar -xzvf deployment_config.tgz;
-              source env.sh;
-              cat at.cfg | docker login -u "axzmghqes1gn/adan.ruiz@tec.mx" --password-stdin mx-queretaro-1.ocir.io
+    command: |
+      cd MtdrSpring
+      oci os object get --bucket-name reacttodo-rolax --name deployment_config.tgz --file deployment_config.tgz
+      tar -xzvf deployment_config.tgz
+      source env.sh
+      echo "e6k)8n.:E6y[#L{5()jm" | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
+
 
   - type: Command
     name: "Build"
