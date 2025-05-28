@@ -43,4 +43,4 @@ steps:
 
 outputArtifacts:
   - name: deploymentArtifact
-    path: artifacts
+    directory: artifacts
