@@ -1,99 +1,77 @@
 version: 0.1
 component: build
-timeoutInSeconds: 1800        # 30 min – ajusta si el native-image tarda más
+timeoutInSeconds: 600
 shell: bash
 
-###############################################################################
-# 1. Entorno
-###############################################################################
 env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
-    OCIR_REGION: mx-queretaro-1
-    OCIR_REPO: ${CONTAINER_REPO_PATH}        # p. ej. axgw2tdpave8/mtdrspring
-
   exportedVariables:
     - BuildServiceDemoVersion
-    - FULL_IMAGE_NAME
 
-###############################################################################
-# 2. Pasos
-###############################################################################
 steps:
   # --------------------------------------------------------------------------
   - type: Command
-    name: "Instalar dependencias de build"
-    timeoutInSeconds: 600
+    name: "Install GraalVM Enterprise 22.x Native Image for Java17"
+    runAs: root
     command: |
-      yum -y install graalvm22-ee-17-native-image docker git maven jq
-      systemctl start docker
+      yum -y install graalvm22-ee-17-native-image
 
   - type: Command
-    name: "Añadir GraalVM al PATH"
+    name: "Set PATH Variable"
     command: |
       export PATH=$JAVA_HOME/bin:$PATH
 
   # --------------------------------------------------------------------------
   - type: Command
-    name: "Derivar versión (hash corto de commit)"
-    command: |
-      BuildServiceDemoVersion=$(git rev-parse --short HEAD)
-      echo "BuildServiceDemoVersion=$BuildServiceDemoVersion" >> "$OCI_EXPORTS_FILE"
-
-  # --------------------------------------------------------------------------
-  - type: Command
-    name: "Login a OCIR (token en claro - solo pruebas)"
+    name: "Docker Login (credenciales axgw2tdpave8)"
     command: |
       cd MtdrSpring
-      oci os object get --bucket-name reacttodo-rolax \
-                        --name deployment_config.tgz \
-                        --file deployment_config.tgz
+      oci os object get \
+        --bucket-name reacttodo-rolax \
+        --name deployment_config.tgz \
+        --file deployment_config.tgz
       tar -xzvf deployment_config.tgz
-      # token generado en User Settings ▸ Auth Tokens
-      docker login -u "axgw2tdpave8/a01285921@tec.mx" \
-                   -p "e6k)8n.:E6y[#L{5()jm" \
-                   ${OCIR_REGION}.ocir.io
+      source env.sh
+      docker login \
+        -u "axgw2tdpave8/a01285921@tec.mx" \
+        -p "e6k)8n.:E6y[#L{5()jm" \
+        mx-queretaro-1.ocir.io || exit 1
 
   # --------------------------------------------------------------------------
   - type: Command
-    name: "Build Java, crear imagen Docker y push a OCIR"
+    name: "Build"
+    failImmediatelyOnError: true
     command: |
+      cd MtdrSpring
+      source env.sh
+      (cd backend && source build.sh)
+
+  # --------------------------------------------------------------------------
+  - type: Command
+    name: "Install K8s"
+    command: |
+      mkdir -p $HOME/k8s $HOME/.kube
+      curl -L -o $HOME/k8s/kubectl https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl
+      chmod +x $HOME/k8s/kubectl
+      export PATH=$PATH:$HOME/k8s
+      kubectl version --client
+
+      oci ce cluster create-kubeconfig \
+        --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaasajbmfcpyzvx6rmvk6rf5mumkqc7tdilav7gtd57ac73xtlczuyq \
+        --file $HOME/.kube/config \
+        --region mx-queretaro-1 \
+        --token-version 2.0.0 \
+        --kube-endpoint PUBLIC_ENDPOINT
+      export KUBECONFIG=$HOME/.kube/config
+
+  # --------------------------------------------------------------------------
+  - type: Command
+    name: "Undeploy"
+    command: |
+      export PATH=$PATH:$HOME/k8s
+      export KUBECONFIG=$HOME/.kube/config
       cd MtdrSpring/backend
-      chmod +x build.sh
-      ./build.sh
-      IMAGE_TAG="$BuildServiceDemoVersion"
-      docker build -t ${OCIR_REGION}.ocir.io/${OCIR_REPO}:${IMAGE_TAG} .
-      docker push    ${OCIR_REGION}.ocir.io/${OCIR_REPO}:${IMAGE_TAG}
-      echo "FULL_IMAGE_NAME=${OCIR_REGION}.ocir.io/${OCIR_REPO}:${IMAGE_TAG}" \
-           >> "$OCI_EXPORTS_FILE"
-
-  # --------------------------------------------------------------------------
-  - type: Command
-    name: "Pruebas Selenium headless"
-    command: |
-      cd MtdrSpring/tests/selenium
-      mvn -B test                     # genera resultados JUnit XML
-
-  # --------------------------------------------------------------------------
-  - type: Command
-    name: "Pruebas de carga JMeter"
-    command: |
-      cd MtdrSpring/tests/jmeter
-      jmeter -n -t load_test.jmx -l results.jtl
-
-  # --------------------------------------------------------------------------
-  - type: Command
-    name: "Escaneo OWASP ZAP baseline"
-    command: |
-      zap-baseline.py \
-        -t "https://your-dev-endpoint.com" \
-        -J zap_report.json \
-        -r zap_report.html
-
-###############################################################################
-# 3. Artifact de salida (imagen Docker)
-###############################################################################
-outputArtifacts:
-  - name: containerImage
-    type: DOCKER_IMAGE
-    location: ${FULL_IMAGE_NAME}
+      source ../env.sh
+      kubectl config view
+      source undeploy.sh
