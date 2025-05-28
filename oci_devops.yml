@@ -6,32 +6,26 @@ shell: bash
 env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
+    PATH: /usr/lib64/graalvm/graalvm22-ee-java17/bin:$PATH
 
 steps:
   - type: Command
-    name: "Install GraalVM Enterprise 22.x Native Image for Java17"
+    name: "Install GraalVM Native Image"
     command: yum -y install graalvm22-ee-17-native-image
 
   - type: Command
-    name: "Set PATH Variable"
-    command: export PATH=$JAVA_HOME/bin:$PATH
-
-  - type: Command
-    name: "Docker Login"
+    name: "Docker Login & Build Image"
     command: |
       cd MtdrSpring
       oci os object get --bucket-name reacttodo-rolax --name deployment_config.tgz --file deployment_config.tgz
       tar -xzvf deployment_config.tgz
       source env.sh
       echo "e6k)8n.:E6y[#L{5()jm" | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
+      (cd backend && source build.sh)
+      echo $DOCKER_IMAGE > ../image.txt
 
-  - type: Command
-    name: "Build"
-    command: |
-      cd MtdrSpring
-      source env.sh
-      (cd backend; source build.sh)
-
-outputParameters:
-  - name: dockerImage
-    value: $DOCKER_IMAGE
+outputArtifacts:
+  - name: deploymentArtifact
+    type: BINARY
+    files:
+      - image.txt
