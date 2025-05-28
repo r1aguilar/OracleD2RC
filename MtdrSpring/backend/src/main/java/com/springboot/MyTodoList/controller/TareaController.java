@@ -53,6 +53,11 @@ public class TareaController {
         return tareaService.findAllTasksFromProject(id);
     }
 
+    @GetMapping(value = "/TareasNoAceptadasProyecto/{id}")
+    public List<Tarea> getAllTareasNoAceptadasProyecto(@PathVariable int id){
+        return tareaService.findAllNotAcceptedFromProject(id);
+    }
+
     @GetMapping(value = "/TareasSprint/{id}")
     public List<Tarea> getAllTareasAceptadasSprint(@PathVariable int id){
         return tareaService.findAllTasksFromSprintForManager(id);

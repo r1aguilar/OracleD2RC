@@ -2,7 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-export function SortableItem({ id, children }) {
+export function SortableItem({ id, children, disabled = false }) {
   const {
     attributes,
     listeners,
@@ -10,7 +10,7 @@ export function SortableItem({ id, children }) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id });
+  } = useSortable({ id, disabled });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -22,8 +22,8 @@ export function SortableItem({ id, children }) {
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
+      {...(disabled ? {} : attributes)}
+      {...(disabled ? {} : listeners)}
       className="mb-3 last:mb-0"
     >
       {children}

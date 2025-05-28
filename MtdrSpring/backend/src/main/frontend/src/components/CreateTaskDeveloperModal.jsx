@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const TaskDetailsModal = ({ task, sprints, onClose, onSave }) => {
+const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
   const [editedTask, setEditedTask] = useState({ ...task });
   const [isSaving, setIsSaving] = useState(false);
   const [sprintInfo, setSprintInfo] = useState(null);
@@ -10,6 +10,8 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave }) => {
 
   // Determinar si la tarea está en estado "done" (columna 3)
   const isDone = task.idColumna === 3;
+
+  var task = 
 
   useEffect(() => {
     if (task?.idSprint && sprints?.length > 0) {
@@ -275,4 +277,4 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave }) => {
   );
 };
 
-export default TaskDetailsModal;
+export default CreateTaskDeveloperModal;

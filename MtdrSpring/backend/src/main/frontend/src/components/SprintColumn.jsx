@@ -1,6 +1,7 @@
 import React from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
+import CreateTaskDeveloperModal from "./CreateTaskDeveloperModal";
 
 const SprintColumn = ({
   sprint,
@@ -54,12 +55,14 @@ const SprintColumn = ({
               </select>
             ) : sprint.completado === false ? "In Progress" : "Completed"}
           </span>
-          <button
-            onClick={() => console.log("TODO: open task modal")}
-            className="flex items-center gap-2 bg-[#2a2a2a] text-white px-4 py-2 rounded-full border border-neutral-600"
-          >
-            <Plus size={12} /> Create new task
-          </button>
+          {!sprint.completado && (
+            <button
+              onClick={() => console.log("TODO: open task modal")}
+              className="flex items-center gap-2 bg-[#2a2a2a] text-white px-4 py-2 rounded-full border border-neutral-600"
+            >
+              <Plus size={12} /> Create new task
+            </button>
+          )}
         </div>
       </div>
       <div className="flex gap-3 flex-wrap items-center">{enhancedChildren}</div>

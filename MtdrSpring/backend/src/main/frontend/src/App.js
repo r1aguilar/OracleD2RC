@@ -5,6 +5,7 @@ import LoginScreen from "./Login";
 import DashDev from "./DashDev";
 import BacklogManager from "./BacklogManager";
 import AnalyticsManager from "./Analytics";
+import AnalyticsSprint from "./Analyticsbysprint";
 import DashManager from "./DashManager";
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
       <Route path="/dashmanager" element={<DashManager />} />
       <Route path="/backlogMan" element={<BacklogManager />} />
       <Route path="/analytics" element={<AnalyticsManager />} />
+      <Route path="/analyticssprint" element={<AnalyticsSprint />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

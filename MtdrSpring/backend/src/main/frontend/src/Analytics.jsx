@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./components/SidebarManager";
 import { ResponsiveContainer, RadialBarChart, RadialBar, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Bell, UserCircle, Menu, CircleCheckBig, CalendarClock, ListChecks } from "lucide-react";
-import GaugeChart from 'react-gauge-chart';
-
+import NotificationPanel from "./components/NotificationPanel";
 
 const AnalyticsManager = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -14,9 +13,7 @@ const AnalyticsManager = () => {
   const [sprints, setSprints] = useState([]);
   const [userTasks, setUserTasks] = useState([]);
   const [totalHoursBySprint, setTotalHoursBySprint] = useState([]);
-
-
-
+  const [showNotifications, setShowNotifications] = useState(false);
 
 
   const userMap = {
@@ -26,8 +23,12 @@ const AnalyticsManager = () => {
     4: "Rodrigo"
   };
 
+  const sprintNameMap = sprints.reduce((acc, s) => {
+    acc[`Sprint${s.id}`] = s.name;
+    return acc;
+  }, {});
 
-  
+  var fontSize = 16;
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -38,17 +39,16 @@ const AnalyticsManager = () => {
         const response = await fetch(`http://localhost:8080/pruebas/TareasSprint/${sprintNumber}`);
         const data = await response.json();
   
-        const formatted = data.map((task) => ({
-          name: task.nombre,
-          sprint: `Sprint${task.idSprint}`,
-          estimatedhours: task.tiempoEstimado || 0,
-          realhours: task.tiempoReal || 0,
-          status:
-            task.idColumna === 1 ? "Pending" :
-            task.idColumna === 2 ? "Doing": "Done",
-          user: userMap[task.idEncargado] || "Developer",
-          storypoints: task.storyPoints || 0
-        }));
+        const formatted = data
+          .filter(t => t.idSprint !== null)
+          .map(t => ({
+            user: userMap[t.idEncargado] || "Developer",
+            sprint: `Sprint${t.idSprint}`,
+            realhours: t.tiempoReal || 0,
+            status:
+              t.idColumna === 1 ? "Pending" :
+              t.idColumna === 2 ? "Doing" : "Done"
+          }));
   
         setAllTasks(formatted);
       } catch (err) {
@@ -60,41 +60,41 @@ const AnalyticsManager = () => {
   }, [selectedSprint]);
 
   useEffect(() => {
-  const fetchSprints = async () => {
-    try {
-      const response = await fetch("http://localhost:8080/pruebasSprint/SprintsForKPIs/1");
-      const data = await response.json();
+    const fetchSprints = async () => {
+      try {
+        const response = await fetch("http://localhost:8080/pruebasSprint/SprintsForKPIs/1");
+        const data = await response.json();
 
-      const formattedSprints = data.map(sprint => ({
-        id: sprint.id,
-        name: `Sprint${sprint.id}`,
-        label: sprint.nombre,
-        date: new Date(sprint.fechaFin).toLocaleDateString("en-US", {
-          month: "short", day: "numeric", year: "numeric"
-        }),
-        tareasTotales: sprint.tareasTotales,
-        tareasCompletadas: sprint.tareasCompletadas,
-        status: sprint.tareasCompletadas === 0
-          ? "Pending"
-          : sprint.tareasTotales === sprint.tareasCompletadas
-          ? "Completed"
-          : "Doing",
-        progress: sprint.tareasCompletadas === 0
-          ? 0
-          : Math.round((sprint.tareasTotales / sprint.tareasCompletadas) * 100)
-      }));
+        const formattedSprints = data.map(sprint => ({
+          id: sprint.id,
+          name: `${sprint.nombre}`,
+          label: sprint.nombre,
+          date: new Date(sprint.fechaFin).toLocaleDateString("en-US", {
+            month: "short", day: "numeric", year: "numeric"
+          }),
+          tareasTotales: sprint.tareasTotales,
+          tareasCompletadas: sprint.tareasCompletadas,
+          status: sprint.tareasCompletadas === 0
+            ? "Pending"
+            : sprint.tareasTotales === sprint.tareasCompletadas
+            ? "Completed"
+            : "Doing",
+          progress: sprint.tareasCompletadas === 0
+            ? 0
+            : Math.round((sprint.tareasTotales / sprint.tareasCompletadas) * 100)
+        }));
 
-      setSprints(formattedSprints);
-    } catch (error) {
-      console.error("Error fetching sprint KPIs:", error);
-    }
-  };
+        setSprints(formattedSprints);
+      } catch (error) {
+        console.error("Error fetching sprint KPIs:", error);
+      }
+    };
 
-  fetchSprints();
-}, []);
-
+    fetchSprints();
+  }, []);
 
 useEffect(() => {
+  if (sprints.length === 0) return;
   const fetchAllUserTasks = async () => {
     try {
       const userIds = [1, 2, 3, 4];
@@ -116,14 +116,30 @@ useEffect(() => {
           const sprintName = `Sprint${t.idSprint}`;
           hoursPerSprintMap[sprintName] = (hoursPerSprintMap[sprintName] || 0) + (t.tiempoReal || 0);
         });
-        const chartData = Object.entries(hoursPerSprintMap)
+        var chartData = Object.entries(hoursPerSprintMap)
           .map(([sprint, hours]) => ({ sprint, hours }))
           .sort((a, b) => {
             const numA = parseInt(a.sprint.replace("Sprint", ""));
             const numB = parseInt(b.sprint.replace("Sprint", ""));
             return numA - numB;
           });
+        
+        chartData = chartData
+        .filter(({ sprint }) => sprint !== "Sprintnull") // 🚫 Filter out Sprintnull
+        .map(({ sprint, hours }) => {
+          const sprintId = parseInt(sprint.replace("Sprint", ""));
+          const sprintObj = sprints.find(s => s.id === sprintId);
+          return {
+            sprint: sprintObj ? sprintObj.name : sprint, // ✅ Replace with name if found
+            hours
+          };
+        });
+
         setTotalHoursBySprint(chartData);
+
+        fontSize = totalHoursBySprint.length > 10
+        ? Math.max(8, 20 - totalHoursBySprint.length)
+        : 14;
       }
       setUserTasks(allTasks);
     } catch (err) {
@@ -131,20 +147,11 @@ useEffect(() => {
     }
   };
   fetchAllUserTasks();
-}, []);
-  
-  
+}, [sprints]);
+
+
 
 const sprintTasks = allTasks.filter(t => t.sprint === selectedSprint);
-const filteredTasks = selectedFilter === "ALL"
-? sprintTasks
-: sprintTasks.filter((t) =>
-    selectedFilter === "Completed"
-      ? t.status === "Done"
-      : selectedFilter === "Pending"
-      ? t.status === "Pending"
-      : t.status === "Doing"
-  );
 
 
 const totalStoryPoints = sprintTasks.reduce((sum, t) => sum + (t.storypoints || 0), 0);
@@ -243,14 +250,16 @@ const uniqueSprints = [...new Set(userTasks.map(row => row.sprint))].sort((a, b)
 const uniqueUsers = [...new Set(userTasks.map(row => row.user))];
 
 // Crear tabla de horas trabajadas
-const sprintTable = uniqueSprints.map(sprint => {
-  const row = { sprint };
-  uniqueUsers.forEach(user => {
-    const match = grouped.find(r => r.sprint === sprint && r.user === user);
-    row[user] = match ? match.hours : 0;
+const sprintTable = uniqueSprints
+  .filter(sprintKey => sprintNameMap[sprintKey]) // ignore null or unmatched
+  .map(sprintKey => {
+    const row = { sprint: sprintNameMap[sprintKey] };
+    uniqueUsers.forEach(user => {
+      const match = grouped.find(r => r.sprint === sprintKey && r.user === user);
+      row[user] = match ? match.hours : 0;
+    });
+    return row;
   });
-  return row;
-});
 
 // Agrupar tareas completadas por sprint y usuario
 const completedTasksPerSprint = {};
@@ -268,14 +277,16 @@ userTasks.forEach(t => {
 const groupedCompleted = Object.values(completedTasksPerSprint);
 
 // Crear tabla de tareas completadas
-const completedSprintTable = uniqueSprints.map(sprint => {
-  const row = { sprint };
-  uniqueUsers.forEach(user => {
-    const match = groupedCompleted.find(r => r.sprint === sprint && r.user === user);
-    row[user] = match ? match.tasks : 0;
+const completedSprintTable = uniqueSprints
+  .filter(sprintKey => sprintNameMap[sprintKey])
+  .map(sprintKey => {
+    const row = { sprint: sprintNameMap[sprintKey] };
+    uniqueUsers.forEach(user => {
+      const match = groupedCompleted.find(r => r.sprint === sprintKey && r.user === user);
+      row[user] = match ? match.tasks : 0;
+    });
+    return row;
   });
-  return row;
-});
 
 const getProgressColor = (progress) => {
   if (progress >= 80) return "#00C49F";   // Verde (bueno)
@@ -306,6 +317,9 @@ const totalWorkedHours = userTasks.reduce((sum, task) => sum + (task.realhours |
 
 const totalCompletedTasks = userTasks.filter(task => task.status === "Done").length;
 
+const toggleNotifications = () => {
+  setShowNotifications(prev => !prev);
+};
 
   return (
     <div className="flex h-screen bg-[#1a1a1a]">
@@ -325,11 +339,13 @@ const totalCompletedTasks = userTasks.filter(task => task.status === "Done").len
               ))}
             </select>
               <div className="flex items-center gap-3">
-                <Bell className="text-white cursor-pointer hover:text-red-500" />
-                <UserCircle className="text-white w-8 h-8 cursor-pointer hover:text-red-500" />
+                <NotificationPanel />
+                <UserCircle className="text-white w-8 h-8 me-6 cursor-pointer hover:text-red-500" />
               </div>
           </div>
         </header>
+
+
 
   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 ">
     <div className="bg-[#2a2a2a] rounded p-4">
@@ -473,24 +489,25 @@ const totalCompletedTasks = userTasks.filter(task => task.status === "Done").len
   </div>
 
 {/* BLOQUE DE PRODUCTIVIDAD - SEGUNDA FILA */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-    {/* Productivity - All Sprints */}
+<div className=" mt-6">
   <div className="bg-[#2a2a2a] rounded p-4">
-    <h3 className="text-md font-semibold text-white mb-4">Worked hours by developer</h3>
-    <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={sprintTable}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-        <XAxis dataKey="sprint" stroke="#ccc" />
-        <YAxis stroke="#ccc" />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="Daniela" fill="#A7322C" />
-        <Bar dataKey="Dora" fill="#BA3E2B" />
-        <Bar dataKey="Carlos" fill="#9e3e2f" />
-        <Bar dataKey="Rodrigo" fill="#66210E" />
-      </BarChart>
-    </ResponsiveContainer>
+  <h3 className="text-md font-semibold text-white mb-4">Worked hours by developer</h3>
+  <ResponsiveContainer width="100%" height={200}>
+    <BarChart data={sprintTable}>
+      <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+      <XAxis dataKey="sprint" stroke="#ccc" />
+      <YAxis stroke="#ccc" />
+      <Tooltip />
+      <Legend />
+      <Bar dataKey="Daniela" fill="#A7322C" />
+      <Bar dataKey="Dora" fill="#BA3E2B" />
+      <Bar dataKey="Carlos" fill="#9e3e2f" />
+      <Bar dataKey="Rodrigo" fill="#66210E" />
+    </BarChart> 
+  </ResponsiveContainer>
   </div>
+</div>
+<div className=" mt-6">
   <div className="bg-[#2a2a2a] rounded p-4">
     <h3 className="text-md font-semibold text-white mb-4">Completed tasks by developer</h3>
     <ResponsiveContainer width="100%" height={200}>
@@ -507,46 +524,51 @@ const totalCompletedTasks = userTasks.filter(task => task.status === "Done").len
       </BarChart>
     </ResponsiveContainer>
   </div>
-
-
- 
-
-
-
 </div>
-<div className=" mt-6">
+
+<div className="mt-6">
   <div className="bg-[#2a2a2a] rounded p-4 mt-6">
     <h3 className="text-lg font-semibold mb-4">Total Worked Hours by Sprint</h3>
-    <ResponsiveContainer width="100%" height={300}>
-      <AreaChart data={totalHoursBySprint}>
-        <defs>
-          <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#DD4F3A" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#DD4F3A" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-        <XAxis dataKey="sprint" stroke="#ccc" />
-        <YAxis stroke="#ccc" />
-        <Tooltip />
-        <Legend />
-        <Area 
-          type="monotone" 
-          dataKey="hours" 
-          stroke="#DD4F3A" 
-          fillOpacity={1} 
-          fill="url(#colorHours)" 
-          name="Total Hours" 
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  </div>
-
-
     
+    <div className="overflow-x-auto">
+      <div style={{ minWidth: totalHoursBySprint.length * 160 }}> {/* Adjust 80 as needed */}
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={totalHoursBySprint}>
+            <defs>
+              <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#DD4F3A" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="#DD4F3A" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+            <XAxis 
+              dataKey="sprint" 
+              stroke="#ccc" 
+              fontSize={12} 
+              angle={-70}
+              height={60} 
+            />
+            <YAxis stroke="#ccc" />
+            <Tooltip />
+            <Legend />
+            <Area 
+              type="monotone" 
+              dataKey="hours" 
+              stroke="#DD4F3A" 
+              fillOpacity={1} 
+              fill="url(#colorHours)" 
+              name="Total Hours" 
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+
   </div>
 </div>
-</div>
+
+    </div>
+  </div>
   );
 };
 

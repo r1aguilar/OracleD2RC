@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "./components/SortableItem";
-import { Bell, UserCircle, Menu } from "lucide-react";
+import { Bell, UserCircle, Menu, Lock} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const tagColors = {
@@ -56,40 +56,52 @@ const EmptyDropArea = ({ columnId }) => {
   );
 };
 
-const TaskList = ({ columnId, tasks, onTaskClick }) => {
+const TaskList = ({ columnId, tasks, onTaskClick, sprints }) => {
   if (tasks.length === 0) {
     return <EmptyDropArea columnId={columnId} />;
   }
 
   return (
-    <SortableContext 
+    <SortableContext
       items={tasks.map(t => t.id)}
       strategy={verticalListSortingStrategy}
     >
-      {tasks.map((task) => (
-        <SortableItem key={task.id} id={task.id}>
-          <div 
-            className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 cursor-pointer hover:border-red-500 transition-colors"
-            onClick={() => onTaskClick(task)}
-          >
-            <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
-              {task.type}
-            </span>
-            <h3 className="font-semibold text-white mt-2">{task.title}</h3>
-            <p className="text-sm text-gray-400">{task.description}</p>
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-xs text-gray-500">
-                {new Date(task.fechaVencimiento).toLocaleDateString()}
-              </p>
-              {task.idColumna === 3 && task.tiempoReal > 0 && (
-                <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
-                  {task.tiempoReal} hrs
-                </span>
-              )}
+      {tasks.map((task) => {
+        const sprint = sprints.find(s => s.id === task.idSprint);
+        const isLocked = sprint?.completado === true;
+
+        return (
+          <SortableItem key={task.id} id={task.id} disabled={isLocked}>
+            <div
+              className={`bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 transition-colors ${isLocked ? 'opacity-70' : 'cursor-pointer hover:border-red-500'}`}
+              onClick={() => !isLocked && onTaskClick(task)}
+            >
+              <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
+                {task.type}
+              </span>
+              <h3 className="font-semibold text-white mt-2">{task.title}</h3>
+              <p className="text-sm text-gray-400">{task.description}</p>
+              <div className="flex justify-between items-center mt-2">
+                <p className="text-xs text-gray-500">
+                  {new Date(task.fechaVencimiento).toLocaleDateString()}
+                </p>
+                <div className="flex items-center gap-2">
+                  {task.idColumna === 3 && task.tiempoReal > 0 && (
+                    <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
+                      {task.tiempoReal} hrs
+                    </span>
+                  )}
+                  {isLocked && (
+                    <span className="text-xs text-gray-400" title="Sprint completado">
+                      <Lock className="text-white" />
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        </SortableItem>
-      ))}
+          </SortableItem>
+        );
+      })}
     </SortableContext>
   );
 };
@@ -311,8 +323,8 @@ const DashDev = () => {
       // Asegurar que los campos numéricos sean números
       const prioridad = Number(updatedTask.prioridad) || 1;
       const tiempoReal = updatedTask.idColumna === 3 ? 
-        (Number(updatedTask.tiempoReal) || 0) : 
-        (updatedTask.tiempoReal || 0);
+        (Number(updatedTask.tiempoReal) || null) : 
+        (updatedTask.tiempoReal || null);
 
       const payload = {
         idTarea: updatedTask.rawId,
@@ -331,7 +343,7 @@ const DashDev = () => {
         storyPoints: updatedTask.storyPoints,
         tiempoReal: tiempoReal,
         tiempoEstimado: updatedTask.tiempoEstimado,
-        aceptada: updatedTask.aceptada !== undefined ? updatedTask.aceptada : 1,
+        aceptada: updatedTask.aceptada,
       };
 
       console.log("Enviando datos al servidor:", payload); // Para depuración
@@ -592,6 +604,7 @@ const DashDev = () => {
                   columnId={columnId}
                   tasks={columnTasks}
                   onTaskClick={handleTaskClick}
+                  sprints={sprints}
                 />
               </DroppableColumn>
             ))}

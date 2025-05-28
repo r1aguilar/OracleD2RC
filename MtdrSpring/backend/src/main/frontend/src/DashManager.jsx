@@ -20,8 +20,18 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "./components/SortableItem";
-import { Bell, UserCircle, Menu } from "lucide-react";
+import { Bell, UserCircle, Menu, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Pagination } from 'swiper/modules';
+
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import ManagerAcceptTaskModal from "./components/ManagerAcceptTaskModal";
+
+
 
 const tagColors = {
   High: "bg-red-600",
@@ -56,43 +66,56 @@ const EmptyDropArea = ({ columnId }) => {
   );
 };
 
-const TaskList = ({ columnId, tasks, onTaskClick }) => {
+const TaskList = ({ columnId, tasks, onTaskClick, sprints }) => {
   if (tasks.length === 0) {
     return <EmptyDropArea columnId={columnId} />;
   }
 
   return (
-    <SortableContext 
-      items={tasks.map(t => t.id)}
+    <SortableContext
+      items={tasks.filter(Boolean).map(t => t.id)}
       strategy={verticalListSortingStrategy}
     >
-      {tasks.map((task) => (
-        <SortableItem key={task.id} id={task.id}>
-          <div 
-            className="bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 cursor-pointer hover:border-red-500 transition-colors"
-            onClick={() => onTaskClick(task)}
-          >
-            <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
-              {task.type}
-            </span>
-            <h3 className="font-semibold text-white mt-2">{task.title}</h3>
-            <p className="text-sm text-gray-400">{task.description}</p>
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-xs text-gray-500">
-                {new Date(task.fechaVencimiento).toLocaleDateString()}
-              </p>
-              {task.idColumna === 3 && task.tiempoReal > 0 && (
-                <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
-                  {task.tiempoReal} hrs
-                </span>
-              )}
+      {tasks.filter(Boolean).map((task) => {
+        const sprint = task.idSprint ? sprints.find(s => s.id === task.idSprint) : null;
+        const isLocked = sprint?.completado === true;
+
+        return (
+          <SortableItem key={task.id} id={task.id} disabled={isLocked}>
+            <div
+              className={`bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 transition-colors ${isLocked ? 'opacity-70' : 'cursor-pointer hover:border-red-500'}`}
+              onClick={() => !isLocked && onTaskClick(task)}
+            >
+              <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
+                {task.type}
+              </span>
+              <h3 className="font-semibold text-white mt-2">{task.title}</h3>
+              <p className="text-sm text-gray-400">{task.description}</p>
+              <div className="flex justify-between items-center mt-2">
+                <p className="text-xs text-gray-500">
+                  {new Date(task.fechaVencimiento).toLocaleDateString()}
+                </p>
+                <div className="flex items-center gap-2">
+                  {task.idColumna === 3 && task.tiempoReal > 0 && (
+                    <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
+                      {task.tiempoReal} hrs
+                    </span>
+                  )}
+                  {isLocked && (
+                    <span className="text-xs text-gray-400" title="Sprint completado">
+                      <Lock className="text-white" />
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        </SortableItem>
-      ))}
+          </SortableItem>
+        );
+      })}
     </SortableContext>
   );
 };
+
 
 const DroppableColumn = ({ id, title, tasksCount, children, isOver }) => {
   return (
@@ -128,12 +151,44 @@ const DashManager = () => {
   const [selectedIntegrante, setSelectedIntegrante] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showTaskModalNotAccepted, setShowTaskModalNotAccepted] = useState(false);
   const [debugSprintInfo, setDebugSprintInfo] = useState(null);
+  const [notAcceptedTasks, setNotAcceptedTasks] = useState([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  const fetchNotAcceptedTasks = useCallback(async (proyectoId = selectedProyecto) => {
+    if (!proyectoId) return;
+
+    try {
+      const res = await fetch(`/pruebas/TareasNoAceptadasProyecto/${proyectoId}`);
+      if (!res.ok) throw new Error("Error loading not accepted tasks");
+
+      const data = await res.json();
+
+      const tasks = data.map(task => ({
+        id: `notaccepted-${task.idTarea}`,
+        rawId: task.idTarea,
+        idEncargado: task.idEncargado,
+        idProyecto: task.idProyecto,
+        idColumna: task.idColumna,
+        idSprint: task.idSprint,
+        title: task.nombre,
+        description: task.descripcion,
+        fechaInicio: task.fechaInicio,
+        fechaVencimiento: task.fechaVencimiento,
+        prioridad: task.prioridad,
+        type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
+      }));
+
+      setNotAcceptedTasks(tasks);
+    } catch (err) {
+      console.error("Failed to fetch not accepted tasks", err);
+    }
+  }, [selectedProyecto]);
 
   const fetchProyectos = useCallback(async () => {
     const userId = JSON.parse(localStorage.getItem("userId"));
@@ -265,8 +320,9 @@ const DashManager = () => {
       fetchTasks(selectedProyecto);
       fetchSprints(selectedProyecto);
       fetchIntegrantes(selectedProyecto);
+      fetchNotAcceptedTasks(selectedProyecto);
     }
-  }, [selectedProyecto, fetchTasks, fetchSprints, fetchIntegrantes]);
+  }, [selectedProyecto, fetchTasks, fetchSprints, fetchIntegrantes, fetchNotAcceptedTasks]);
 
   useEffect(() => {
     console.log("Selected sprints:", Array.from(selectedSprints));
@@ -310,6 +366,25 @@ const DashManager = () => {
     });
   }, [selectedSprints, allTasks, selectedIntegrante]);
 
+  useEffect(() => {
+    const container = document.getElementById("scrollContainer");
+    const leftArrow = document.getElementById("scrollLeft");
+    const rightArrow = document.getElementById("scrollRight");
+
+    if (!container || !leftArrow || !rightArrow) return;
+
+    const updateArrows = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      leftArrow.style.display = scrollLeft > 0 ? "block" : "none";
+      rightArrow.style.display = scrollLeft + clientWidth < scrollWidth ? "block" : "none";
+    };
+
+    container.addEventListener("scroll", updateArrows);
+    updateArrows();
+
+    return () => container.removeEventListener("scroll", updateArrows);
+  }, [notAcceptedTasks]);
+
   const handleSprintToggle = (sprintId, isChecked) => {
     const numericSprintId = Number(sprintId);
     if (isNaN(numericSprintId)) {
@@ -334,6 +409,11 @@ const DashManager = () => {
   const handleTaskClick = (task) => {
     setSelectedTask(task);
     setShowTaskModal(true);
+  };
+
+  const handleTaskClickNotAccepted = (task) => {
+    setSelectedTask(task);
+    setShowTaskModalNotAccepted(true);
   };
 
   const updateTaskState = (state, updatedTask) => {
@@ -363,14 +443,22 @@ const DashManager = () => {
       // Validate estimated hours
       const horasEstimadas = parseInt(updatedTask.tiempoEstimado);
       if (isNaN(horasEstimadas) || horasEstimadas < 0) {
-        throw new Error("El tiempo estimado debe ser un número entero positivo");
+        throw new Error("Estimated Time must be positive integer");
       }
 
       // Ensure numeric fields
       const prioridad = Number(updatedTask.prioridad) || 1;
       const tiempoReal = updatedTask.idColumna === 3 ? 
-        (Number(updatedTask.tiempoReal) || 0) : 
-        (updatedTask.tiempoReal || 0);
+        (Number(updatedTask.tiempoReal) || null) : 
+        (updatedTask.tiempoReal || null);
+      
+      if(updatedTask.aceptada === false){
+        const storyP = parseInt(updatedTask.storyPoints);
+        if(isNaN(storyP) || storyP < 0) {
+          throw new Error("Story points must be positive integer");
+        }
+        updatedTask.aceptada = true;
+      }
 
       const payload = {
         idTarea: updatedTask.rawId,
@@ -433,181 +521,29 @@ const DashManager = () => {
     }
   };
 
-  const findColumn = (itemId) => {
-    if (itemId === "pending" || itemId === "doing" || itemId === "done") {
-      return itemId;
-    }
-    
-    for (const colId of ["pending", "doing", "done"]) {
-      if (tasks[colId].some(task => task.id === itemId)) {
-        return colId;
-      }
-    }
-    
-    return null;
-  };
+  const handleDeleteTask = async (deletedTask) => {
+    try {
+      const response = await fetch(`/pruebas/deleteTarea/${deletedTask.rawId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token") || ''}`,
+        },
+      });
 
-  const handleDragStart = ({ active }) => {
-    const column = findColumn(active.id);
-    if (!column) return;
-    
-    const task = tasks[column].find((t) => t.id === active.id);
-    setActiveId(active.id);
-    setActiveTask(task || null);
-    
-    setOriginalTaskLocations(prev => ({
-      ...prev,
-      [active.id]: column
-    }));
-  };
+      const deletedFlag = await response.json();
 
-  const handleDragOver = ({ active, over }) => {
-    if (!active || !over) {
-      setOverColumnId(null);
-      return;
-    }
-    
-    const overColumn = ["pending", "doing", "done"].includes(over.id) 
-      ? over.id 
-      : findColumn(over.id);
-    
-    setOverColumnId(overColumn);
-    
-    const activeColumn = findColumn(active.id);
-    
-    if (!activeColumn || !overColumn || activeColumn === overColumn) return;
-    
-    setTasks(prevTasks => {
-      const activeItems = [...prevTasks[activeColumn]];
-      const overItems = [...prevTasks[overColumn]];
-      
-      const activeIndex = activeItems.findIndex(item => item.id === active.id);
-      if (activeIndex === -1) return prevTasks;
-      
-      const taskToMove = { ...activeItems[activeIndex] };
-      
-      return {
-        ...prevTasks,
-        [activeColumn]: activeItems.filter(item => item.id !== active.id),
-        [overColumn]: [...overItems, taskToMove]
-      };
-    });
-  };
-
-  const handleDragEnd = async ({ active, over }) => {
-    setOverColumnId(null);
-
-    if (!active || !over) {
-      setActiveId(null);
-      setActiveTask(null);
-      return;
-    }
-
-    const sourceColumn = originalTaskLocations[active.id];
-    let targetColumn = null;
-
-    if (["pending", "doing", "done"].includes(over.id)) {
-      targetColumn = over.id;
-    } else {
-      for (const col of ["pending", "doing", "done"]) {
-        if (tasks[col].some(task => task.id === over.id)) {
-          targetColumn = col;
-          break;
-        }
-      }
-    }
-
-    if (!sourceColumn || !targetColumn) {
-      console.error("Source or target column not found");
-      setActiveId(null);
-      setActiveTask(null);
-      return;
-    }
-
-    if (sourceColumn === targetColumn) {
-      if (over.id !== targetColumn) {
-        const activeIndex = tasks[sourceColumn].findIndex(task => task.id === active.id);
-        const overIndex = tasks[targetColumn].findIndex(task => task.id === over.id);
-        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-          setTasks(prev => ({
-            ...prev,
-            [sourceColumn]: arrayMove(prev[sourceColumn], activeIndex, overIndex),
-          }));
-        }
-      }
-    } else {
-      const originalTask = tasks[sourceColumn]?.find(task => task.id === active.id) || activeTask;
-      if (!originalTask) {
-        console.error("Original task not found:", active.id);
-        setActiveId(null);
-        setActiveTask(null);
-        return;
-      }
-
-      const targetColumnId = columnMap[targetColumn];
-
-      setTasks(prev => ({
-        ...prev,
-        [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
-        [targetColumn]: [...prev[targetColumn], { 
-          ...originalTask, 
-          idColumna: targetColumnId,
-          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0
-        }]
-      }));
-      
-      setAllTasks(prev => ({
-        ...prev,
-        [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
-        [targetColumn]: [...prev[targetColumn], { 
-          ...originalTask, 
-          idColumna: targetColumnId,
-          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0
-        }]
-      }));
-
-      setOriginalTaskLocations(prev => ({
-        ...prev,
-        [active.id]: targetColumn,
-      }));
-
-      try {
-        const response = await fetch(`/pruebas/updateTarea/${originalTask.rawId}`, {
-          method: "PUT",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("token") || ''}`
-          },
-          body: JSON.stringify({
-            idTarea: originalTask.rawId,
-            idEncargado: originalTask.idEncargado,
-            idProyecto: originalTask.idProyecto,
-            idColumna: targetColumnId,
-            idSprint: originalTask.idSprint,
-            nombre: originalTask.title,
-            descripcion: originalTask.description,
-            prioridad: originalTask.prioridad,
-            fechaInicio: originalTask.fechaInicio,
-            fechaVencimiento: originalTask.fechaVencimiento,
-            fechaCompletado: originalTask.fechaCompletado,
-            storyPoints: originalTask.storyPoints,
-            tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0,
-            tiempoEstimado: originalTask.tiempoEstimado,
-            aceptada: originalTask.aceptada,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Server responded with ${response.status}`);
-        }
-      } catch (error) {
-        console.error("Failed to update task:", error);
+      if (deletedFlag === true) {
+        // Refetch task lists
         fetchTasks();
+        fetchNotAcceptedTasks();
+      } else {
+        console.warn("Deletion did not return true. Response:", deletedFlag);
       }
+    } catch (error) {
+      console.error("Error al borrar:", error);
+      throw error;
     }
-
-    setActiveId(null);
-    setActiveTask(null);
   };
 
   const progress =
@@ -675,6 +611,55 @@ const DashManager = () => {
           </div>
         </header>
 
+        <section className="bg-[#2a2a2a] text-white rounded-lg p-4 mb-6 overflow-hidden">
+          <h2 className="text-lg font-semibold mb-4">Not Accepted Tasks</h2>
+
+          <div className="relative pb-6"> {/* Extra space for pagination */}
+            <Swiper
+              modules={[Pagination]}
+              pagination={{
+                clickable: true,
+                el: ".custom-swiper-pagination",
+              }}
+              spaceBetween={20}
+              slidesPerView="auto"
+              className="!overflow-hidden"
+              style={{ height: '150px' }}
+            >
+              {notAcceptedTasks.map((task) => (
+                <SwiperSlide
+                  key={task.id}
+                  className="!w-auto !flex-shrink-0"
+                >
+                  <div
+                    className="w-[260px] h-[150px] bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 cursor-pointer hover:border-red-500 transition-colors flex flex-col justify-between overflow-hidden"
+                    onClick={() => handleTaskClickNotAccepted(task)}
+                  >
+                    <div>
+                      <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
+                        {task.type}
+                      </span>
+                      <h3 className="font-semibold text-white mt-2 break-words">
+                        {task.title}
+                      </h3>
+                      <p className="text-sm text-gray-400 break-words overflow-hidden text-ellipsis whitespace-nowrap">
+                        {task.description}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {new Date(task.fechaVencimiento).toLocaleDateString()}
+                    </p>
+                  </div>
+                </SwiperSlide>
+              ))}
+            </Swiper>
+
+            {/* Custom pagination container BELOW swiper */}
+            <div className="custom-swiper-pagination flex justify-center mt-2" />
+          </div>
+        </section>
+
+
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -693,6 +678,7 @@ const DashManager = () => {
                   columnId={columnId}
                   tasks={columnTasks}
                   onTaskClick={handleTaskClick}
+                  sprints={sprints}
                 />
               </DroppableColumn>
             ))}
@@ -740,6 +726,18 @@ const DashManager = () => {
             sprints={sprints}
             integrantes={integrantes}
             onClose={() => setShowTaskModal(false)}
+            onDelete={handleDeleteTask}
+            onSave={handleSaveTask}
+          />
+        )}
+
+        {showTaskModalNotAccepted && (
+          <ManagerAcceptTaskModal
+            task={selectedTask}
+            sprints={sprints}
+            integrantes={integrantes}
+            onClose={() => setShowTaskModalNotAccepted(false)}
+            onDelete={handleDeleteTask}
             onSave={handleSaveTask}
           />
         )}

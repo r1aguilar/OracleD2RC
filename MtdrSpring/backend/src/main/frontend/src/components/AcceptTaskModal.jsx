@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 
-const AcceptTaskModal = ({ task, sprints, integrantes, onClose, onSave }) => {
+const AcceptTaskModal = ({ task, sprints, integrantes, onClose, onSave, onDelete}) => {
   const [editedTask, setEditedTask] = useState({ ...task });
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [sprintInfo, setSprintInfo] = useState(null);
   const [minDate, setMinDate] = useState("");
   const [maxDate, setMaxDate] = useState("");
@@ -62,6 +63,22 @@ const AcceptTaskModal = ({ task, sprints, integrantes, onClose, onSave }) => {
       }));
     }
   };
+
+  const handleDeleteTask = async (e) => {
+      e.preventDefault();
+      setError(null);
+      setIsDeleting(true);
+
+      try {
+        await onDelete(editedTask);
+        onClose();
+      } catch (err) {
+        console.error("Error deleting task:", err);
+        setError(err.message || "Error deleting Task, try again.");
+      } finally {
+        setIsDeleting(false);
+      }
+  }
 
   const handleDateChange = (e) => {
     const { value } = e.target;
@@ -298,10 +315,12 @@ const AcceptTaskModal = ({ task, sprints, integrantes, onClose, onSave }) => {
                 required
               >
                 <option value="">Seleccionar Sprint</option>
-                {sprints.map(sprint => (
-                  <option key={sprint.id} value={sprint.id}>
-                    {sprint.nombre || `Sprint ${sprint.id}`}
-                  </option>
+                {sprints
+                  .filter(sprint => sprint.completado === false)
+                  .map(sprint => (
+                    <option key={sprint.id} value={sprint.id}>
+                      {sprint.nombre || `Sprint ${sprint.id}`}
+                    </option>
                 ))}
               </select>
             </div>
@@ -326,6 +345,13 @@ const AcceptTaskModal = ({ task, sprints, integrantes, onClose, onSave }) => {
           </div>
 
           <div className="mt-6 flex justify-end gap-3">
+            <button
+                type="button"
+                onClick={onDelete}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                {isDeleting ? 'Deleting ...' : 'Delete Task'}
+            </button>
             <button
               type="button"
               onClick={onClose}
