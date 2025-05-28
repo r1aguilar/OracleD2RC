@@ -1,0 +1,19 @@
+# MtdrSpring/.oci/deploy_spec.yaml
+version: 0.1
+component: deployment
+timeoutInSeconds: 3600
+failImmediatelyOnError: true
+
+steps:
+  - type: Kubernetes
+    name: "Blue/Green deploy to OKE"
+    kubernetesClusterOcid: ${okeClusterOcid}      # pipeline parameter
+    namespace: ${namespace}                       # pipeline parameter
+    manifestFiles:
+      - k8s/deployment.yaml
+      - k8s/service.yaml
+    image: ${springboot-image.location}
+    strategy:
+      type: BLUE_GREEN
+      activeLabel: prod
+      previewLabel: preview
