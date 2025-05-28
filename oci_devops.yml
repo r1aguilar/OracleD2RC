@@ -21,3 +21,9 @@ steps:
       echo "Simulando creación de imagen Docker..."
       IMAGE_NAME="mx-queretaro-1.ocir.io/tu_namespace/mtdr-spring:auto$(date +%s)"
       echo "Imagen simulada: $IMAGE_NAME"
+
+    outputArtifacts:
+  - name: deploySpec
+    type: BINARY
+    location: deploy_spec.yaml
+
