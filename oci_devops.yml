@@ -9,11 +9,12 @@ env:
 
 steps:
   - type: Command
-    name: "Install GraalVM Native Image"
-    command: yum -y install graalvm22-ee-17-native-image
+    name: "Instalar GraalVM Native Image"
+    command: |
+      yum -y install graalvm22-ee-17-native-image
 
   - type: Command
-    name: "Docker Login & Build Image"
+    name: "Login en Docker y Construcción de Imagen"
     command: |
       export PATH=$JAVA_HOME/bin:$PATH
       cd MtdrSpring
@@ -22,9 +23,9 @@ steps:
       source env.sh
       echo "e6k)8n.:E6y[#L{5()jm" | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
       (cd backend && source build.sh)
-      echo $DOCKER_IMAGE > ../output/image.txt
+      echo $DOCKER_IMAGE > image.txt
 
 outputArtifacts:
   - name: deploymentArtifact
-    type: DIRECTORY
-    location: output
+    type: BINARY
+    location: image.txt
