@@ -36,7 +36,7 @@ const AnalyticsManager = () => {
       const sprintNumber = selectedSprint.replace("Sprint", "");
   
       try {
-        const response = await fetch(`http://localhost:8080/pruebas/TareasSprint/${sprintNumber}`);
+        const response = await fetch(`/pruebas/TareasSprint/${sprintNumber}`);
         const data = await response.json();
   
         const formatted = data
@@ -62,7 +62,7 @@ const AnalyticsManager = () => {
   useEffect(() => {
     const fetchSprints = async () => {
       try {
-        const response = await fetch("http://localhost:8080/pruebasSprint/SprintsForKPIs/1");
+        const response = await fetch("/pruebasSprint/SprintsForKPIs/1");
         const data = await response.json();
 
         const formattedSprints = data.map(sprint => ({
@@ -101,7 +101,7 @@ useEffect(() => {
       const allTasks = [];
       const hoursPerSprintMap = {};
       for (const id of userIds) {
-        const res = await fetch(`http://localhost:8080/pruebas/TareasUsuario/${id}`);
+        const res = await fetch(`/pruebas/TareasUsuario/${id}`);
         const data = await res.json();
         const formatted = data.map(t => ({
           user: userMap[t.idEncargado] || "Developer",
