@@ -38,3 +38,15 @@ outputArtifacts:
   - name: mtdrspring_image
     type: DOCKER_IMAGE
     location: mx-queretaro-1.ocir.io/axgw2tdpave8/mtdrspring:latest
+
+
+      - type: Command
+    name: "Undeploy"
+    command: export PATH=$PATH:$HOME/k8s;kubectl version;
+      export KUBECONFIG=$HOME/.kube/config;
+      cd MtdrSpring;
+      source env.sh;
+      cd backend;
+      ls -l;
+      kubectl config view;
+      source undeploy.sh;
