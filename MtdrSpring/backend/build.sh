@@ -22,3 +22,6 @@ docker push $IMAGE
 if [  $? -eq 0 ]; then
     docker rmi "$IMAGE" #local
 fi
+
+mkdir -p ../../artifacts
+echo $IMAGE > ../../artifacts/image.txt
