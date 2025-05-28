@@ -1,36 +1,97 @@
-version: 0.1 
+# MtdrSpring/.oci/build_spec.yaml
+version: 0.1
 component: build
-timeoutInSeconds: 600
+timeoutInSeconds: 7200          # 2 h total
 shell: bash
-#ola
+failImmediatelyOnError: true
+
 env:
+  # ────────────────────────────────────────────────
+  # plain environment variables
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
-
+    PROJECT_DIR: MtdrSpring
+    IMAGE_NAME: ${imageName}            #   ⇽ pipeline parameter
+    OCIR_REGION: mx-queretaro-1
+  # secret pulled from OCI Vault (OCID stored as a pipeline parameter)
+  vaultVariables:
+    DOCKER_PASSWORD: ${dockerOcirSecretOcId}
+  # values we want to pass to the **deployment** pipeline
   exportedVariables:
-    - BuildServiceDemoVersion
+    - IMAGE_TAG
+    - IMAGE_NAME_FULL
 
 steps:
+  # 1) GraalVM native-image tool (pre-installed on DevOps image, but safe guard)
   - type: Command
-    name: "Install GraalVM Enterprise 22.x Native Image for Java17"
-    command: yum -y install graalvm22-ee-17-native-image
+    name: "Install GraalVM Native Image"
+    command: |
+      yum -y install graalvm22-ee-17-native-image || true
 
+  # 2) Build + unit tests
   - type: Command
-    name: "Set PATH Variable"
-    command: export PATH=$JAVA_HOME/bin:$PATH
+    name: "Maven build"
+    command: |
+      cd ${PROJECT_DIR}/backend
+      mvn -B clean verify
 
+  # 3) Headless Selenium UI smoke tests (Chrome)
   - type: Command
-    name: "Docker Login"
-    command:  cd MtdrSpring;
-              oci os object get --bucket-name reacttodo-rolax --name deployment_config.tgz --file deployment_config.tgz;
-              tar -xzvf deployment_config.tgz;
-              source env.sh;
-              cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
+    timeoutInSeconds: 900
+    name: "Selenium smoke"
+    command: |
+      cd ${PROJECT_DIR}/ui-tests
+      mvn -B test -Dselenide.headless=true
 
+  # 4) Lightweight JMeter performance check
   - type: Command
-    name: "Build"
-    command:  cd MtdrSpring;
-              source env.sh;
-              (cd backend;source build.sh)
+    timeoutInSeconds: 900
+    name: "JMeter load"
+    command: |
+      jmeter -n -t ${PROJECT_DIR}/tests/perf/smoke.jmx \
+             -l results.jtl -e -o report
 
+  # 5) OWASP ZAP baseline (non-intrusive) vulnerability scan  :contentReference[oaicite:0]{index=0}
+  - type: Command
+    timeoutInSeconds: 1200
+    name: "OWASP ZAP baseline"
+    command: |
+      docker run --rm \
+        -v $(pwd):/zap/wrk/:rw \
+        owasp/zap2docker-stable zap-baseline.py \
+          -t http://localhost:8080 \
+          -w zap_report.md || true   # don't block the build yet
 
+  # 6) Build & push OCI Registry image
+  - type: Command
+    name: "Docker build + push"
+    command: |
+      IMAGE_TAG=$(echo ${OCI_BUILD_RUN_ID} | cut -c1-7)
+      IMAGE_NAME_FULL=${OCIR_REGION}.ocir.io/${OCIR_TENANCY}/${IMAGE_NAME}:${IMAGE_TAG}
+      docker login ${OCIR_REGION}.ocir.io \
+        -u "${OCIR_USER}" -p "$DOCKER_PASSWORD"
+      docker build -t ${IMAGE_NAME_FULL} ${PROJECT_DIR}
+      docker push ${IMAGE_NAME_FULL}
+
+      # hand the tag to later stages
+      echo IMAGE_TAG=${IMAGE_TAG} >> $OCI_EXPORTS_FILE
+      echo IMAGE_NAME_FULL=${IMAGE_NAME_FULL} >> $OCI_EXPORTS_FILE
+
+  # 7) Collect test artefacts so they’re visible in the console
+  - type: Command
+    name: "Publish reports"
+    command: |
+      mkdir -p ${OCI_WORKSPACE_DIR}/reports
+      cp -r ${PROJECT_DIR}/ui-tests/target/surefire-reports \
+            ${OCI_WORKSPACE_DIR}/reports/selenium
+      cp -r report                              ${OCI_WORKSPACE_DIR}/reports/jmeter
+      cp zap_report.md                          ${OCI_WORKSPACE_DIR}/reports
+
+outputArtifacts:
+  - name: springboot-image        # consumed by deployment pipeline
+    type: DOCKER_IMAGE
+    location: ${IMAGE_NAME_FULL}
+
+  - name: test-reports            # just so you can download them
+    type: BINARY
+    location: ${OCI_WORKSPACE_DIR}/reports
