@@ -1,97 +1,103 @@
-# MtdrSpring/.oci/build_spec.yaml
 version: 0.1
 component: build
-timeoutInSeconds: 7200          # 2 h total
+timeoutInSeconds: 1800        # 30 min – raise if native-image is slow
 shell: bash
-failImmediatelyOnError: true
 
+###############################################################################
+# 1. Environment
+###############################################################################
 env:
-  # ────────────────────────────────────────────────
-  # plain environment variables
   variables:
+    # GraalVM EE for Java 17 (kept from your spec)
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
-    PROJECT_DIR: MtdrSpring
-    IMAGE_NAME: ${imageName}            #   ⇽ pipeline parameter
+
+    # OCIR coordinates – leave the repo name as a PIPELINE PARAMETER so it
+    # can be reused by Dev / Staging / Prod.  Edit the default values in the
+    # pipeline UI (see step 9).
     OCIR_REGION: mx-queretaro-1
-  # secret pulled from OCI Vault (OCID stored as a pipeline parameter)
-  vaultVariables:
-    DOCKER_PASSWORD: ${dockerOcirSecretOcId}
-  # values we want to pass to the **deployment** pipeline
+    OCIR_REPO: ${CONTAINER_REPO_PATH}     # ⇒  axgw2tdpave8/mtdrspring
+
   exportedVariables:
-    - IMAGE_TAG
-    - IMAGE_NAME_FULL
+    # Sent to subsequent stages (Deliver Artifacts / Deploy):
+    - BuildServiceDemoVersion    # short Git SHA
+    - FULL_IMAGE_NAME            # repo:tag that was pushed
 
+###############################################################################
+# 2. Steps
+###############################################################################
 steps:
-  # 1) GraalVM native-image tool (pre-installed on DevOps image, but safe guard)
+  # --------------------------------------------------------------------------
   - type: Command
-    name: "Install GraalVM Native Image"
+    name: "Install build dependencies"
+    timeoutInSeconds: 600
     command: |
-      yum -y install graalvm22-ee-17-native-image || true
+      yum -y install graalvm22-ee-17-native-image docker git maven jq
+      systemctl start docker
 
-  # 2) Build + unit tests
   - type: Command
-    name: "Maven build"
+    name: "Add GraalVM to PATH"
     command: |
-      cd ${PROJECT_DIR}/backend
-      mvn -B clean verify
+      export PATH=$JAVA_HOME/bin:$PATH
 
-  # 3) Headless Selenium UI smoke tests (Chrome)
+  # --------------------------------------------------------------------------
   - type: Command
-    timeoutInSeconds: 900
-    name: "Selenium smoke"
+    name: "Derive build version (short commit hash)"
     command: |
-      cd ${PROJECT_DIR}/ui-tests
-      mvn -B test -Dselenide.headless=true
+      BuildServiceDemoVersion=$(git rev-parse --short HEAD)
+      echo "BuildServiceDemoVersion=$BuildServiceDemoVersion" >> "$OCI_EXPORTS_FILE"
 
-  # 4) Lightweight JMeter performance check
+  # --------------------------------------------------------------------------
   - type: Command
-    timeoutInSeconds: 900
-    name: "JMeter load"
+    name: "Login to OCIR with temp creds from Object Storage"
     command: |
-      jmeter -n -t ${PROJECT_DIR}/tests/perf/smoke.jmx \
-             -l results.jtl -e -o report
+      cd MtdrSpring
+      oci os object get --bucket-name reacttodo-rolax \
+                        --name deployment_config.tgz \
+                        --file deployment_config.tgz
+      tar -xzvf deployment_config.tgz
+      source env.sh                      # populates at.cfg
+      cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" \
+                               --password-stdin ${OCIR_REGION}.ocir.io
 
-  # 5) OWASP ZAP baseline (non-intrusive) vulnerability scan  :contentReference[oaicite:0]{index=0}
+  # --------------------------------------------------------------------------
   - type: Command
-    timeoutInSeconds: 1200
-    name: "OWASP ZAP baseline"
+    name: "Build Java, build Docker image, push to OCIR"
     command: |
-      docker run --rm \
-        -v $(pwd):/zap/wrk/:rw \
-        owasp/zap2docker-stable zap-baseline.py \
-          -t http://localhost:8080 \
-          -w zap_report.md || true   # don't block the build yet
+      cd MtdrSpring/backend
+      chmod +x build.sh
+      ./build.sh                          # compiles jar / native image
+      IMAGE_TAG="$BuildServiceDemoVersion"
+      docker build -t ${OCIR_REGION}.ocir.io/${OCIR_REPO}:${IMAGE_TAG} .
+      docker push    ${OCIR_REGION}.ocir.io/${OCIR_REPO}:${IMAGE_TAG}
+      echo "FULL_IMAGE_NAME=${OCIR_REGION}.ocir.io/${OCIR_REPO}:${IMAGE_TAG}" \
+           >> "$OCI_EXPORTS_FILE"
 
-  # 6) Build & push OCI Registry image
+  # --------------------------------------------------------------------------
   - type: Command
-    name: "Docker build + push"
+    name: "Selenium headless UI tests"
     command: |
-      IMAGE_TAG=$(echo ${OCI_BUILD_RUN_ID} | cut -c1-7)
-      IMAGE_NAME_FULL=${OCIR_REGION}.ocir.io/${OCIR_TENANCY}/${IMAGE_NAME}:${IMAGE_TAG}
-      docker login ${OCIR_REGION}.ocir.io \
-        -u "${OCIR_USER}" -p "$DOCKER_PASSWORD"
-      docker build -t ${IMAGE_NAME_FULL} ${PROJECT_DIR}
-      docker push ${IMAGE_NAME_FULL}
+      cd MtdrSpring/tests/selenium
+      mvn -B test                             # JUnit XML results land in ./target
 
-      # hand the tag to later stages
-      echo IMAGE_TAG=${IMAGE_TAG} >> $OCI_EXPORTS_FILE
-      echo IMAGE_NAME_FULL=${IMAGE_NAME_FULL} >> $OCI_EXPORTS_FILE
-
-  # 7) Collect test artefacts so they’re visible in the console
+  # --------------------------------------------------------------------------
   - type: Command
-    name: "Publish reports"
+    name: "JMeter load tests"
     command: |
-      mkdir -p ${OCI_WORKSPACE_DIR}/reports
-      cp -r ${PROJECT_DIR}/ui-tests/target/surefire-reports \
-            ${OCI_WORKSPACE_DIR}/reports/selenium
-      cp -r report                              ${OCI_WORKSPACE_DIR}/reports/jmeter
-      cp zap_report.md                          ${OCI_WORKSPACE_DIR}/reports
+      cd MtdrSpring/tests/jmeter
+      jmeter -n -t load_test.jmx -l results.jtl
 
+  # --------------------------------------------------------------------------
+  - type: Command
+    name: "OWASP ZAP baseline scan"
+    command: |
+      zap-baseline.py -t "https://your-dev-endpoint.com" \
+                      -J zap_report.json     \
+                      -r zap_report.html
+
+###############################################################################
+# 3. Output artifact (container image)
+###############################################################################
 outputArtifacts:
-  - name: springboot-image        # consumed by deployment pipeline
+  - name: containerImage
     type: DOCKER_IMAGE
-    location: ${IMAGE_NAME_FULL}
-
-  - name: test-reports            # just so you can download them
-    type: BINARY
-    location: ${OCI_WORKSPACE_DIR}/reports
+    location: ${FULL_IMAGE_NAME}            # ← required syntax :contentReference[oaicite:0]{index=0}
