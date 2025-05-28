@@ -1,39 +1,64 @@
 version: 0.1
 component: build
-timeoutInSeconds: 1200
+timeoutInSeconds: 600
 shell: bash
 
 env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
-    IMAGE_NAME: "mx-queretaro-1.ocir.io/axgw2tdpave8/mtdr-spring"
-    IMAGE_TAG: "latest"
 
   exportedVariables:
-    - IMAGE_NAME
-    - IMAGE_TAG
+    - BuildServiceDemoVersion
 
 steps:
   - type: Command
-    name: "Install GraalVM Native Image"
+    name: "Install GraalVM Enterprise 22.x Native Image for Java17"
     command: yum -y install graalvm22-ee-17-native-image
 
   - type: Command
-    name: "Set PATH"
+    name: "Set PATH Variable"
     command: export PATH=$JAVA_HOME/bin:$PATH
 
   - type: Command
-    name: "Login to OCIR"
-    command: |
+    name: "Docker Login"
+    command: cd MtdrSpring;
+      oci os object get --bucket-name reacttodo-ehtx3 --name deployment_config.tgz --file deployment_config.tgz;
+      tar -xzvf deployment_config.tgz;
+      source env.sh;
       echo "e6k)8n.:E6y[#L{5()jm" | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
 
   - type: Command
-    name: "Build Docker Image"
-    command: |
-      cd MtdrSpring/backend
-      docker build -t $IMAGE_NAME:$IMAGE_TAG .
+    name: "Build"
+    failInmediatelyOnError: true
+    command: cd MtdrSpring;
+      source env.sh;
+      (cd backend;source build.sh)
 
-outputArtifacts:
-  - name: mtdrImage
-    type: DOCKER_IMAGE
-    imageUri: ${IMAGE_NAME}:${IMAGE_TAG}
+  - type: Command
+    name: "Install K8s"
+    command: mkdir -p $HOME/.kube;
+      cd $HOME;
+      ls -la;
+      mkdir k8s;
+      ls -la;
+      cd k8s;
+      wget https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl;
+      ls -la;
+      chmod +x kubectl;
+      export PATH=$PATH:$HOME/k8s;
+      kubectl version --client;
+      cd ..;
+      cd .kube;
+      oci ce cluster create-kubeconfig --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaasajbmfcpyzvx6rmvk6rf5mumkqc7tdilav7gtd57ac73xtlczuyq --file $HOME/.kube/config --region mx-queretaro-1 --token-version 2.0.0  --kube-endpoint PUBLIC_ENDPOINT;
+      export KUBECONFIG=$HOME/.kube/config;
+
+  - type: Command
+    name: "Undeploy"
+    command: export PATH=$PATH:$HOME/k8s;kubectl version;
+      export KUBECONFIG=$HOME/.kube/config;
+      cd MtdrSpring;
+      source env.sh;
+      cd backend;
+      ls -l;
+      kubectl config view;
+      source undeploy.sh;
