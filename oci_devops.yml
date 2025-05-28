@@ -48,16 +48,18 @@ steps:
 
   # --------------------------------------------------------------------------
   - type: Command
-    name: "Login to OCIR with temp creds from Object Storage"
+    name: "Login to OCIR con token"
     command: |
       cd MtdrSpring
       oci os object get --bucket-name reacttodo-rolax \
                         --name deployment_config.tgz \
                         --file deployment_config.tgz
       tar -xzvf deployment_config.tgz
-      source env.sh                      # populates at.cfg
-      cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" \
-                               --password-stdin ${OCIR_REGION}.ocir.io
+      source env.sh
+      # --- OCIR login con token explícito ------------------------------
+      docker login -u "axgw2tdpave8/a01285921@tec.mx" \
+                   -p "e6k)8n.:E6y[#L{5()jm" \
+                   ${OCIR_REGION}.ocir.io
 
   # --------------------------------------------------------------------------
   - type: Command
