@@ -55,6 +55,7 @@ steps:
 
   - type: Command
     name: "Undeploy"
+    ignoreFailure: True
     command: export PATH=$PATH:$HOME/k8s;kubectl version;
       export KUBECONFIG=$HOME/.kube/config;
       cd MtdrSpring;
