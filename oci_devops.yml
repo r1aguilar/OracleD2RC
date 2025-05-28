@@ -50,7 +50,8 @@ steps:
       kubectl version --client;
       cd ..;
       cd .kube;
-      oci ce cluster create-kubeconfig --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaaj4geigf35a5xkwdkizx3ypfrnkipq6hjmplkwuxbnczi5nt6e4oa --file $HOME/.kube/config --region mx-queretaro-1 --token-version 2.0.0  --kube-endpoint PUBLIC_ENDPOINT      export KUBECONFIG=$HOME/.kube/config;
+      oci ce cluster create-kubeconfig --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaaj4geigf35a5xkwdkizx3ypfrnkipq6hjmplkwuxbnczi5nt6e4oa --file $HOME/.kube/config --region mx-queretaro-1 --token-version 2.0.0  --kube-endpoint PUBLIC_ENDPOINT      
+      export KUBECONFIG=$HOME/.kube/config;
 
   - type: Command
     name: "Undeploy"
