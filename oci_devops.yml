@@ -1,4 +1,4 @@
-version: 0.1
+version: 0.1 
 component: build
 timeoutInSeconds: 600
 shell: bash
@@ -21,44 +21,16 @@ steps:
 
   - type: Command
     name: "Docker Login"
-    command: cd MtdrSpring;
-      oci os object get --bucket-name reacttodo-ehtx3 --name deployment_config.tgz --file deployment_config.tgz;
-      tar -xzvf deployment_config.tgz;
-      source env.sh;
-      echo "e6k)8n.:E6y[#L{5()jm" | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
+    command:  cd MtdrSpring;
+              oci os object get --bucket-name reacttodo-rolax --name deployment_config.tgz --file deployment_config.tgz;
+              tar -xzvf deployment_config.tgz;
+              source env.sh;
+              cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
 
   - type: Command
     name: "Build"
-    failInmediatelyOnError: true
-    command: cd MtdrSpring;
-      source env.sh;
-      (cd backend;source build.sh)
+    command:  cd MtdrSpring;
+              source env.sh;
+              (cd backend;source build.sh)
 
-  - type: Command
-    name: "Install K8s"
-    command: mkdir -p $HOME/.kube;
-      cd $HOME;
-      ls -la;
-      mkdir k8s;
-      ls -la;
-      cd k8s;
-      wget https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl;
-      ls -la;
-      chmod +x kubectl;
-      export PATH=$PATH:$HOME/k8s;
-      kubectl version --client;
-      cd ..;
-      cd .kube;
-      oci ce cluster create-kubeconfig --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaasajbmfcpyzvx6rmvk6rf5mumkqc7tdilav7gtd57ac73xtlczuyq --file $HOME/.kube/config --region mx-queretaro-1 --token-version 2.0.0  --kube-endpoint PUBLIC_ENDPOINT;
-      export KUBECONFIG=$HOME/.kube/config;
 
-  - type: Command
-    name: "Undeploy"
-    command: export PATH=$PATH:$HOME/k8s;kubectl version;
-      export KUBECONFIG=$HOME/.kube/config;
-      cd MtdrSpring;
-      source env.sh;
-      cd backend;
-      ls -l;
-      kubectl config view;
-      source undeploy.sh;
