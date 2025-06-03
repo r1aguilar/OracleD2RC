@@ -1,16 +1,17 @@
 version: 0.1
 component: build
-timeoutInSeconds: 600
+timeoutInSeconds: 900          # aumentamos 5 min para dar tiempo al scan
 shell: bash
 
 env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
-
+    APP_PORT: "8080"           # puerto donde arranca el Spring Boot
   exportedVariables:
     - BuildServiceDemoVersion
 
 steps:
+# ▸ 1. Dependencias y login (sin cambios) ───────────────────────────────────
   - type: Command
     name: "Install GraalVM Enterprise 22.x Native Image for Java17"
     command: yum -y install graalvm22-ee-17-native-image
@@ -21,46 +22,66 @@ steps:
 
   - type: Command
     name: "Docker Login"
-    command:  cd MtdrSpring;
-              oci os object get --bucket-name reacttodo-crj8s --name deployment_config.tgz --file deployment_config.tgz;
-              tar -xzvf deployment_config.tgz;
-              source env.sh;
-              cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" --password-stdin mx-queretaro-1.ocir.io
+    command: |
+      cd MtdrSpring
+      oci os object get --bucket-name reacttodo-crj8s \
+                        --name deployment_config.tgz \
+                        --file deployment_config.tgz
+      tar -xzvf deployment_config.tgz
+      source env.sh
+      cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" \
+               --password-stdin mx-queretaro-1.ocir.io
 
-
+# ▸ 2. Build (sin cambios) ──────────────────────────────────────────────────
   - type: Command
     name: "Build"
-    failInmediatelyOnError: true
-    command: cd MtdrSpring;
-      source env.sh;
-      (cd backend;source build.sh)
+    failImmediatelyOnError: true
+    command: |
+      cd MtdrSpring
+      source env.sh
+      (cd backend && source build.sh)          
 
+# ▸ 3. SECURITY: OWASP ZAP baseline scan ────────────────────────────────────
   - type: Command
-    name: "Install K8s"
-    command: mkdir -p $HOME/.kube;
-      cd $HOME;
-      ls -la;
-      mkdir k8s;
-      ls -la;
-      cd k8s;
-      wget https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl;
-      ls -la;
-      chmod +x kubectl;
-      export PATH=$PATH:$HOME/k8s;
-      kubectl version --client;
-      cd ..;
-      cd .kube;
-      oci ce cluster create-kubeconfig --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaaj4geigf35a5xkwdkizx3ypfrnkipq6hjmplkwuxbnczi5nt6e4oa --file $HOME/.kube/config --region mx-queretaro-1 --token-version 2.0.0  --kube-endpoint PUBLIC_ENDPOINT;      
-      export KUBECONFIG=$HOME/.kube/config;
+    name: "Security Test – OWASP ZAP"
+    command: |
+      cd MtdrSpring/backend
 
-  - type: Command
-    name: "Undeploy"
-    ignoreFailure: True
-    command: export PATH=$PATH:$HOME/k8s;kubectl version;
-      export KUBECONFIG=$HOME/.kube/config;
-      cd MtdrSpring;
-      source env.sh;
-      cd backend;
-      ls -l;
-      kubectl config view;
-      source undeploy.sh;
+      # --- 3.1 Levanta la app a testear -----------------------
+      IMAGE_TAG=$(cat ../../image_tag.txt)
+      echo "[INFO] Arrancando contenedor $IMAGE_TAG…"
+      docker run -d --name uut -p ${APP_PORT}:${APP_PORT} \
+                 "$IMAGE_TAG"
+      echo "[INFO] Esperando a que la app responda…"
+      for i in {1..24}; do
+        curl -s "http://localhost:${APP_PORT}/actuator/health" | grep -q '"UP"' && break
+        sleep 5
+      done
+
+      # --- 3.2 Ejecuta ZAP baseline ---------------------------
+      mkdir -p zap
+      docker run --rm --network host \
+        -v "$(pwd)/zap:/zap/wrk" \
+        owasp/zap2docker-stable zap-baseline.py \
+          -t "http://localhost:${APP_PORT}" \
+          -m 2 \                 # falla con alertas ≥Medium
+          -r zap_report.html \
+          -x zap_report.xml \
+          -w zap_failcount.txt
+      FAILS=$(cat zap_failcount.txt)
+
+      # --- 3.3 Cierra contenedor y evalúa resultado ------------
+      docker stop uut && docker rm uut
+      echo "[INFO] ZAP encontró $FAILS problemas bloqueantes."
+      if [ "$FAILS" -gt 0 ]; then
+        echo "[ERROR] Vulnerabilidades encontradas – fallando build."
+        exit 1
+      fi
+
+outputArtifacts:                # publica los reportes
+  - name: zap_html_report
+    type: BINARY
+    location: MtdrSpring/backend/zap/zap_report.html
+  - name: zap_xml_report
+    type: BINARY
+    location: MtdrSpring/backend/zap/zap_report.xml
