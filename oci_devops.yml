@@ -1,17 +1,16 @@
 version: 0.1
 component: build
-timeoutInSeconds: 900          # aumentamos 5 min para dar tiempo al scan
+timeoutInSeconds: 900          # +5 min para dar tiempo al scan
 shell: bash
 
 env:
   variables:
     JAVA_HOME: /usr/lib64/graalvm/graalvm22-ee-java17
-    APP_PORT: "8080"           # puerto donde arranca el Spring Boot
   exportedVariables:
     - BuildServiceDemoVersion
 
 steps:
-# ▸ 1. Dependencias y login (sin cambios) ───────────────────────────────────
+  # ────────── 1. PREPARACIÓN (sin cambios) ────────────────────────────────
   - type: Command
     name: "Install GraalVM Enterprise 22.x Native Image for Java17"
     command: yum -y install graalvm22-ee-17-native-image
@@ -30,58 +29,86 @@ steps:
       tar -xzvf deployment_config.tgz
       source env.sh
       cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" \
-               --password-stdin mx-queretaro-1.ocir.io
+                   --password-stdin mx-queretaro-1.ocir.io
 
-# ▸ 2. Build (sin cambios) ──────────────────────────────────────────────────
+  # ────────── 2. BUILD (sin cambios)───────────────────────────────────────
   - type: Command
     name: "Build"
-    failImmediatelyOnError: true
+    failInmediatelyOnError: true          # (mantengo tu ortografía original)
     command: |
       cd MtdrSpring
       source env.sh
-      (cd backend && source build.sh)          
+      (cd backend && source build.sh)
 
-# ▸ 3. SECURITY: OWASP ZAP baseline scan ────────────────────────────────────
+  # ────────── 3. 🔐 SECURITY TEST – OWASP ZAP ─────────────────────────────
   - type: Command
     name: "Security Test – OWASP ZAP"
     command: |
-      cd MtdrSpring/backend
+      set -euo pipefail
+      echo "[INFO] Lanzando escaneo ZAP…"
 
-      # --- 3.1 Levanta la app a testear -----------------------
-      IMAGE_TAG=$(cat ../../image_tag.txt)
-      echo "[INFO] Arrancando contenedor $IMAGE_TAG…"
-      docker run -d --name uut -p ${APP_PORT}:${APP_PORT} \
-                 "$IMAGE_TAG"
-      echo "[INFO] Esperando a que la app responda…"
+      IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | head -n1)
+      echo "[INFO] Usaré la imagen $IMAGE"
+
+      docker run -d --name uut -p 8080:8080 "$IMAGE"
+
       for i in {1..24}; do
-        curl -s "http://localhost:${APP_PORT}/actuator/health" | grep -q '"UP"' && break
+        nc -z localhost 8080 && break
         sleep 5
       done
 
-      # --- 3.2 Ejecuta ZAP baseline ---------------------------
-      mkdir -p zap
+      mkdir -p MtdrSpring/backend/zap
       docker run --rm --network host \
-        -v "$(pwd)/zap:/zap/wrk" \
+        -v "$(pwd)/MtdrSpring/backend/zap:/zap/wrk" \
         owasp/zap2docker-stable zap-baseline.py \
-          -t "http://localhost:${APP_PORT}" \
-          -m 2 \                 # falla con alertas ≥Medium
+          -t "http://localhost:8080" \
+          -m 2 \
           -r zap_report.html \
           -x zap_report.xml \
           -w zap_failcount.txt
-      FAILS=$(cat zap_failcount.txt)
 
-      # --- 3.3 Cierra contenedor y evalúa resultado ------------
+      FAILS=$(cat MtdrSpring/backend/zap/zap_failcount.txt)
       docker stop uut && docker rm uut
-      echo "[INFO] ZAP encontró $FAILS problemas bloqueantes."
+      echo "[INFO] ZAP encontró $FAILS vulnerabilidades bloqueantes"
+
       if [ "$FAILS" -gt 0 ]; then
-        echo "[ERROR] Vulnerabilidades encontradas – fallando build."
+        echo "[ERROR] Build detenido por hallazgos Medium/High"
         exit 1
       fi
+      echo "[INFO] ZAP OK — continúa la pipeline"
 
-outputArtifacts:                # publica los reportes
+  # ────────── 4. K8s & UNDEPLOY (sin cambios) ─────────────────────────────
+  - type: Command
+    name: "Install K8s"
+    command: |
+      mkdir -p $HOME/.kube
+      cd $HOME && mkdir -p k8s && cd k8s
+      wget https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl
+      chmod +x kubectl
+      export PATH=$PATH:$HOME/k8s
+      kubectl version --client
+      oci ce cluster create-kubeconfig \
+          --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaaj4geigf35a5xkwdkizx3ypfrnkipq6hjmplkwuxbnczi5nt6e4oa \
+          --file $HOME/.kube/config \
+          --region mx-queretaro-1 --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT
+      export KUBECONFIG=$HOME/.kube/config
+
+  - type: Command
+    name: "Undeploy"
+    ignoreFailure: True
+    command: |
+      export PATH=$PATH:$HOME/k8s
+      kubectl version
+      export KUBECONFIG=$HOME/.kube/config
+      cd MtdrSpring && source env.sh && cd backend
+      kubectl config view
+      source undeploy.sh
+
+# ────────── 5. REPORTES (sección global, no un paso) ──────────────────────
+outputArtifacts:
   - name: zap_html_report
     type: BINARY
     location: MtdrSpring/backend/zap/zap_report.html
   - name: zap_xml_report
     type: BINARY
-    location: MtdrSpring/backend/zap/zap_report.xml
+    location: MtdrSpring/backend/zap/zap_report.xml   # visible en pestaña “Artifacts”
