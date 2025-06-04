@@ -1,6 +1,6 @@
 version: 0.1
 component: build
-timeoutInSeconds: 900        # +5 min para el pull y el escaneo
+timeoutInSeconds: 900            # +5 min para pull y escaneo
 shell: bash
 
 env:
@@ -10,7 +10,7 @@ env:
     - BuildServiceDemoVersion
 
 steps:
-  # ───── 1. PREPARACIÓN (igual) ───────────────────────────────────────────
+# ─────────────────────────── 1 · PREPARACIÓN ─────────────────────────────
   - type: Command
     name: "Install GraalVM Enterprise 22.x Native Image for Java17"
     command: yum -y install graalvm22-ee-17-native-image
@@ -31,16 +31,16 @@ steps:
       cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" \
                    --password-stdin mx-queretaro-1.ocir.io
 
-  # ───── 2. BUILD (sin cambios) ──────────────────────────────────────────
+# ─────────────────────────── 2 · BUILD ───────────────────────────────────
   - type: Command
     name: "Build"
-    failInmediatelyOnError: true      # se deja tu misma clave
+    failInmediatelyOnError: true      # se deja como en tu spec original
     command: |
       cd MtdrSpring
       source env.sh
       (cd backend && source build.sh)
 
-  # ───── 3. 🔐 SECURITY TEST – OWASP ZAP ─────────────────────────────────
+# ─────────────────────────── 3 · 🔐 SECURITY TEST – OWASP ZAP ────────────
   - type: Command
     name: "Security Test – OWASP ZAP"
     command: |
@@ -48,24 +48,36 @@ steps:
 
       # 3-1 Imagen recién construida
       IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | head -n1)
-      echo "[INFO] Escaneando $IMAGE"
+      echo "[INFO] Imagen a testear: $IMAGE"
 
-      # 3-2 Levanta la app (puerto externo 18080 → interno 8080)
-      docker run -d --name uut -p 18080:8080 "$IMAGE"
+      # 3-2 Arrancar la app (puerto host 18080 → contenedor 8080)
+      docker run -d --name uut -p 18080:8080 \
+        -e SPRING_PROFILES_ACTIVE=ci \
+        "$IMAGE"
 
-      # 3-3 Espera a que el servicio responda (máx. 2 min)
-      for i in {1..24}; do
-        curl -s http://localhost:18080/ >/dev/null && break
+      # 3-3 Esperar hasta 3 min que /actuator/health devuelva "UP"
+      echo "[INFO] Esperando health-check…"
+      for i in {1..36}; do
+        STATUS=$(curl -s http://localhost:18080/actuator/health || true)
+        if echo "$STATUS" | grep -q '"status":"UP"'; then
+          echo "[INFO] Servicio UP"; break; fi
         sleep 5
       done
 
-      # 3-4 Pull explícito de ZAP desde GHCR
+      # 3-4 Verificar que el contenedor siga vivo
+      if ! docker inspect -f '{{.State.Running}}' uut | grep -q true; then
+        echo "[ERROR] El contenedor se detuvo. Logs:"
+        docker logs uut || true
+        exit 125
+      fi
+
+      # 3-5 Pull explícito de ZAP (GHCR)
       docker pull ghcr.io/zaproxy/zaproxy:stable \
         || { echo "[ERROR] No se pudo descargar ZAP"; exit 125; }
 
       mkdir -p MtdrSpring/backend/zap
 
-      # 3-5 Run ZAP baseline
+      # 3-6 Ejecutar ZAP baseline
       docker run --rm --network host \
         -v "$(pwd)/MtdrSpring/backend/zap:/zap/wrk" \
         ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
@@ -82,9 +94,9 @@ steps:
         echo "[ERROR] ZAP encontró $FAILS vulnerabilidades Medium/High"
         exit 1
       fi
-      echo "[INFO] ZAP baseline PASÓ sin Medium/High"
+      echo "[INFO] ZAP baseline PASÓ sin vulnerabilidades críticas"
 
-  # ───── 4. K8s (sin cambios) ────────────────────────────────────────────
+# ─────────────────────────── 4 · K8s (sin cambios) ───────────────────────
   - type: Command
     name: "Install K8s"
     command: |
@@ -102,7 +114,7 @@ steps:
           --kube-endpoint PUBLIC_ENDPOINT
       export KUBECONFIG=$HOME/.kube/config
 
-  # ───── 5. UNDEPLOY (sin cambios) ───────────────────────────────────────
+# ─────────────────────────── 5 · UNDEPLOY (sin cambios) ──────────────────
   - type: Command
     name: "Undeploy"
     ignoreFailure: True
@@ -116,7 +128,7 @@ steps:
       kubectl config view
       source undeploy.sh
 
-# ───── 6. REPORTES ZAP ───────────────────────────────────────────────────
+# ─────────────────────────── 6 · REPORTES ZAP ────────────────────────────
 outputArtifacts:
   - name: zap_html_report
     type: BINARY
