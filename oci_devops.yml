@@ -1,6 +1,6 @@
 version: 0.1
 component: build
-timeoutInSeconds: 900        # +5 min para el escaneo
+timeoutInSeconds: 900        # +5 min para el pull y el escaneo
 shell: bash
 
 env:
@@ -10,7 +10,7 @@ env:
     - BuildServiceDemoVersion
 
 steps:
-  # ─── 1 · PREP (igual que antes) ─────────────────────────────────────────
+  # ───── 1. PREPARACIÓN (igual) ───────────────────────────────────────────
   - type: Command
     name: "Install GraalVM Enterprise 22.x Native Image for Java17"
     command: yum -y install graalvm22-ee-17-native-image
@@ -31,36 +31,45 @@ steps:
       cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" \
                    --password-stdin mx-queretaro-1.ocir.io
 
-  # ─── 2 · BUILD  (sin cambios) ───────────────────────────────────────────
+  # ───── 2. BUILD (sin cambios) ──────────────────────────────────────────
   - type: Command
     name: "Build"
-    failInmediatelyOnError: true
+    failInmediatelyOnError: true      # se deja tu misma clave
     command: |
       cd MtdrSpring
       source env.sh
       (cd backend && source build.sh)
 
-  # ─── 3 · 🔐 SECURITY TEST – OWASP ZAP ───────────────────────────────────
+  # ───── 3. 🔐 SECURITY TEST – OWASP ZAP ─────────────────────────────────
   - type: Command
     name: "Security Test – OWASP ZAP"
     command: |
       set -euo pipefail
+
+      # 3-1 Imagen recién construida
       IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | head -n1)
-      echo "[INFO] Probando imagen $IMAGE"
+      echo "[INFO] Escaneando $IMAGE"
 
-      docker run -d --name uut -p 8080:8080 "$IMAGE"
+      # 3-2 Levanta la app (puerto externo 18080 → interno 8080)
+      docker run -d --name uut -p 18080:8080 "$IMAGE"
 
-      # Esperar a que el servicio responda (máx 2 min)
+      # 3-3 Espera a que el servicio responda (máx. 2 min)
       for i in {1..24}; do
-        curl -s http://localhost:8080/ > /dev/null && break
+        curl -s http://localhost:18080/ >/dev/null && break
         sleep 5
       done
 
+      # 3-4 Pull explícito de ZAP desde GHCR
+      docker pull ghcr.io/zaproxy/zaproxy:stable \
+        || { echo "[ERROR] No se pudo descargar ZAP"; exit 125; }
+
       mkdir -p MtdrSpring/backend/zap
+
+      # 3-5 Run ZAP baseline
       docker run --rm --network host \
         -v "$(pwd)/MtdrSpring/backend/zap:/zap/wrk" \
-        zaproxy/zap-stable zap-baseline.py \
-          -t "http://localhost:8080" \
+        ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+          -t "http://localhost:18080" \
           -m 2 \
           -r zap_report.html \
           -x zap_report.xml \
@@ -68,18 +77,20 @@ steps:
 
       FAILS=$(cat MtdrSpring/backend/zap/zap_failcount.txt)
       docker stop uut && docker rm uut
+
       if [ "$FAILS" -gt 0 ]; then
-        echo "[ERROR] ZAP halló $FAILS alertas Medium/High – deteniendo build"
+        echo "[ERROR] ZAP encontró $FAILS vulnerabilidades Medium/High"
         exit 1
       fi
-      echo "[INFO] ZAP OK – continuando"
+      echo "[INFO] ZAP baseline PASÓ sin Medium/High"
 
-  # ─── 4 · K8s & UNDEPLOY (todo igual) ────────────────────────────────────
+  # ───── 4. K8s (sin cambios) ────────────────────────────────────────────
   - type: Command
     name: "Install K8s"
     command: |
-      mkdir -p $HOME/.kube && cd $HOME
-      mkdir k8s && cd k8s
+      mkdir -p $HOME/.kube
+      cd $HOME
+      mkdir -p k8s && cd k8s
       wget https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl
       chmod +x kubectl
       export PATH=$PATH:$HOME/k8s
@@ -91,6 +102,7 @@ steps:
           --kube-endpoint PUBLIC_ENDPOINT
       export KUBECONFIG=$HOME/.kube/config
 
+  # ───── 5. UNDEPLOY (sin cambios) ───────────────────────────────────────
   - type: Command
     name: "Undeploy"
     ignoreFailure: True
@@ -98,11 +110,13 @@ steps:
       export PATH=$PATH:$HOME/k8s
       kubectl version
       export KUBECONFIG=$HOME/.kube/config
-      cd MtdrSpring && source env.sh && cd backend
+      cd MtdrSpring
+      source env.sh
+      cd backend
       kubectl config view
       source undeploy.sh
 
-# ─── 5 · REPORTES ─────────────────────────────────────────────────────────
+# ───── 6. REPORTES ZAP ───────────────────────────────────────────────────
 outputArtifacts:
   - name: zap_html_report
     type: BINARY
