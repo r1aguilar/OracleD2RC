@@ -1,6 +1,6 @@
 version: 0.1
 component: build
-timeoutInSeconds: 900          # +5 min para dar tiempo al scan
+timeoutInSeconds: 900        # +5 min para el escaneo
 shell: bash
 
 env:
@@ -10,7 +10,7 @@ env:
     - BuildServiceDemoVersion
 
 steps:
-  # ────────── 1. PREPARACIÓN (sin cambios) ────────────────────────────────
+  # ─── 1 · PREP (igual que antes) ─────────────────────────────────────────
   - type: Command
     name: "Install GraalVM Enterprise 22.x Native Image for Java17"
     command: yum -y install graalvm22-ee-17-native-image
@@ -31,36 +31,35 @@ steps:
       cat at.cfg | docker login -u "axgw2tdpave8/a01285921@tec.mx" \
                    --password-stdin mx-queretaro-1.ocir.io
 
-  # ────────── 2. BUILD (sin cambios)───────────────────────────────────────
+  # ─── 2 · BUILD  (sin cambios) ───────────────────────────────────────────
   - type: Command
     name: "Build"
-    failInmediatelyOnError: true          # (mantengo tu ortografía original)
+    failInmediatelyOnError: true
     command: |
       cd MtdrSpring
       source env.sh
       (cd backend && source build.sh)
 
-  # ────────── 3. 🔐 SECURITY TEST – OWASP ZAP ─────────────────────────────
+  # ─── 3 · 🔐 SECURITY TEST – OWASP ZAP ───────────────────────────────────
   - type: Command
     name: "Security Test – OWASP ZAP"
     command: |
       set -euo pipefail
-      echo "[INFO] Lanzando escaneo ZAP…"
-
       IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | head -n1)
-      echo "[INFO] Usaré la imagen $IMAGE"
+      echo "[INFO] Probando imagen $IMAGE"
 
       docker run -d --name uut -p 8080:8080 "$IMAGE"
 
+      # Esperar a que el servicio responda (máx 2 min)
       for i in {1..24}; do
-        nc -z localhost 8080 && break
+        curl -s http://localhost:8080/ > /dev/null && break
         sleep 5
       done
 
       mkdir -p MtdrSpring/backend/zap
       docker run --rm --network host \
         -v "$(pwd)/MtdrSpring/backend/zap:/zap/wrk" \
-        owasp/zap2docker-stable zap-baseline.py \
+        zaproxy/zap-stable zap-baseline.py \
           -t "http://localhost:8080" \
           -m 2 \
           -r zap_report.html \
@@ -69,20 +68,18 @@ steps:
 
       FAILS=$(cat MtdrSpring/backend/zap/zap_failcount.txt)
       docker stop uut && docker rm uut
-      echo "[INFO] ZAP encontró $FAILS vulnerabilidades bloqueantes"
-
       if [ "$FAILS" -gt 0 ]; then
-        echo "[ERROR] Build detenido por hallazgos Medium/High"
+        echo "[ERROR] ZAP halló $FAILS alertas Medium/High – deteniendo build"
         exit 1
       fi
-      echo "[INFO] ZAP OK — continúa la pipeline"
+      echo "[INFO] ZAP OK – continuando"
 
-  # ────────── 4. K8s & UNDEPLOY (sin cambios) ─────────────────────────────
+  # ─── 4 · K8s & UNDEPLOY (todo igual) ────────────────────────────────────
   - type: Command
     name: "Install K8s"
     command: |
-      mkdir -p $HOME/.kube
-      cd $HOME && mkdir -p k8s && cd k8s
+      mkdir -p $HOME/.kube && cd $HOME
+      mkdir k8s && cd k8s
       wget https://dl.k8s.io/v1.31.2/bin/linux/amd64/kubectl
       chmod +x kubectl
       export PATH=$PATH:$HOME/k8s
@@ -90,7 +87,8 @@ steps:
       oci ce cluster create-kubeconfig \
           --cluster-id ocid1.cluster.oc1.mx-queretaro-1.aaaaaaaaj4geigf35a5xkwdkizx3ypfrnkipq6hjmplkwuxbnczi5nt6e4oa \
           --file $HOME/.kube/config \
-          --region mx-queretaro-1 --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT
+          --region mx-queretaro-1 --token-version 2.0.0 \
+          --kube-endpoint PUBLIC_ENDPOINT
       export KUBECONFIG=$HOME/.kube/config
 
   - type: Command
@@ -104,11 +102,11 @@ steps:
       kubectl config view
       source undeploy.sh
 
-# ────────── 5. REPORTES (sección global, no un paso) ──────────────────────
+# ─── 5 · REPORTES ─────────────────────────────────────────────────────────
 outputArtifacts:
   - name: zap_html_report
     type: BINARY
     location: MtdrSpring/backend/zap/zap_report.html
   - name: zap_xml_report
     type: BINARY
-    location: MtdrSpring/backend/zap/zap_report.xml   # visible en pestaña “Artifacts”
+    location: MtdrSpring/backend/zap/zap_report.xml
