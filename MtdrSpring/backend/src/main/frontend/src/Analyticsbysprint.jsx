@@ -207,10 +207,10 @@ userTasks.forEach(t => {
 });
 
 const developerColors = {
-  Daniela: { hours: "#A7322C", tasks: "#A7322C" },
-  Dora: { hours: "#BA3E2B", tasks: "#BA3E2B" },
-  Carlos: { hours: "#9C2F1E", tasks: "#9C2F1E" },
-  Rodrigo: { hours: "#B85134", tasks: "#B85134" }
+  Daniela: { hours: "#BEE9E8", tasks: "#BEE9E8" },
+  Dora: { hours: "#62B6CB", tasks: "#62B6CB" },
+  Carlos: { hours: "#CAE9FF", tasks: "#CAE9FF" },
+  Rodrigo: { hours: "#5FA8D3", tasks: "#5FA8D3" }
 };
 
   return (
@@ -292,12 +292,12 @@ const developerColors = {
                 <span
                   className={`text-xs font-semibold px-2 py-1 rounded-full ${
                     task.user === "Daniela"
-                      ? "bg-[#A7322C] text-white"
+                      ? "bg-[#BEE9E8] text-black"
                       : task.user === "Dora"
-                      ? "bg-[#BA3E2B] text-white"
+                      ? "bg-[#62B6CB] text-black"
                       : task.user === "Carlos"
-                      ? "bg-[#9C2F1E] text-white"
-                      : "bg-[#B85134] text-white"
+                      ? "bg-[#CAE9FF] text-black"
+                      : "bg-[#5FA8D3] text-black"
                   }`}
                 >
                   {task.user}
@@ -311,11 +311,11 @@ const developerColors = {
     </div>
   </div>
 </div>
-
+ 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
           <div className="bg-[#2a2a2a] rounded p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 ">
-              <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#9C2F1E]">
+              <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#f25c54]"> 
                 <ListTodo className="w-14 h-14 " />
               </div>
               <div className="flex flex-col items-start justify-center">
@@ -326,7 +326,7 @@ const developerColors = {
           </div>
           <div className="bg-[#2a2a2a] rounded p-4 text-center">
             <div className="grid grid-cols-1 md:grid-cols-2 ">
-              <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#9C2F1E]">
+              <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#f25c54]">
                 <SquareCheckBig className="w-14 h-14 " />
               </div>
               <div className="flex flex-col items-start justify-center">
@@ -337,7 +337,7 @@ const developerColors = {
           </div>
           <div className="bg-[#2a2a2a] rounded p-4 text-center">
             <div className="grid grid-cols-1 md:grid-cols-2 ">
-              <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#9C2F1E]">
+              <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#f25c54]">
                 <CalendarClock className="w-14 h-14 " />
               </div>
               <div className="flex flex-col items-start justify-center">
@@ -385,7 +385,20 @@ const developerColors = {
             <CartesianGrid strokeDasharray="3 3" stroke="#555" />
             <XAxis dataKey="name" stroke="#ccc" />
             <YAxis stroke="#ccc" />
-            <Tooltip />
+            <Tooltip
+             contentStyle={{
+            backgroundColor: "#333333",  // fondo oscuro
+            borderColor: "#62B6CB",     // borde azul
+            borderRadius: "8px",
+          }}
+          itemStyle={{
+            color: "#ffffff" 
+          }}
+           labelStyle={{
+            color: "#ffffff", 
+            fontWeight: "bold"
+          }}
+            />
             <Legend />
             <Bar dataKey="hours" name="Hours">
   {kpiPersonData.map((entry, index) => (
@@ -425,10 +438,22 @@ const developerColors = {
           <CartesianGrid strokeDasharray="3 3" stroke="#444" />
           <XAxis dataKey="name" stroke="#ccc" />
           <YAxis stroke="#ccc" />
-          <Tooltip />
+          <Tooltip 
+           contentStyle={{
+            backgroundColor: "#333333",  // fondo oscuro
+            borderColor: "#62B6CB",     // borde azul
+            borderRadius: "8px",
+            color: "#ffffff",           // color de texto
+          }}
+         
+           labelStyle={{
+            color: "#ffffff", 
+            fontWeight: "bold"
+          }}
+          />
           <Legend />
-          <Bar dataKey="estimated" fill="#9C2F1E" name="Estimated Hours" />
-          <Bar dataKey="real" fill="#B9382A" name="Real Hours" />
+          <Bar dataKey="estimated" fill="#CAE9FF" name="Estimated Hours" />
+          <Bar dataKey="real" fill="#5FA8D3" name="Real Hours" />
         </BarChart>
       </ResponsiveContainer>
           

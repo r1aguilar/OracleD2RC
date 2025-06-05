@@ -350,7 +350,7 @@ const toggleNotifications = () => {
   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 ">
     <div className="bg-[#2a2a2a] rounded p-4">
       <div className="grid grid-cols-1 md:grid-cols-2 ">
-        <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#9e3e2f]">
+        <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#f25c54]">
           <CircleCheckBig className="w-14 h-14 " />
         </div>
         <div className="flex flex-col items-start justify-center">
@@ -363,7 +363,7 @@ const toggleNotifications = () => {
     </div>
     <div className="bg-[#2a2a2a] rounded p-4">
       <div className="grid grid-cols-1 md:grid-cols-2 ">
-        <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#9e3e2f]">
+        <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#f25c54]">
           <CalendarClock className="w-14 h-14 " />  
         </div>
         <div className="flex flex-col items-start justify-center">
@@ -375,7 +375,7 @@ const toggleNotifications = () => {
 
     <div className="bg-[#2a2a2a] rounded p-4">
       <div className="grid grid-cols-1 md:grid-cols-2 ">
-        <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#9e3e2f]">
+        <div className="ms-6 mt-1 w-20 h-20 flex items-center justify-center rounded-full bg-[#f25c54]">
           <ListChecks className="w-14 h-14" />
         </div>
         <div className="flex flex-col items-start justify-center">
@@ -474,7 +474,7 @@ const toggleNotifications = () => {
         })()}
 
         {/* Needle cap */}
-        <circle cx="100" cy="100" r="6" fill="#fff" stroke="#1a1a1a" strokeWidth="2" />
+        <circle cx="100" cy="100" r="6" fill="#fff" stroke="#2a2a2a" strokeWidth="2" />
       </svg>
 
       
@@ -497,12 +497,23 @@ const toggleNotifications = () => {
       <CartesianGrid strokeDasharray="3 3" stroke="#444" />
       <XAxis dataKey="sprint" stroke="#ccc" />
       <YAxis stroke="#ccc" />
-      <Tooltip />
+      <Tooltip
+      contentStyle={{
+            backgroundColor: "#2a2a2a",  // fondo oscuro
+            borderColor: "#62B6CB",     // borde azul
+            borderRadius: "8px",
+            color: "#ffffff",           // color de texto
+          }}
+       labelStyle={{
+            color: "#ffffff", 
+            fontWeight: "bold"
+          }}
+      />
       <Legend />
-      <Bar dataKey="Daniela" fill="#A7322C" />
-      <Bar dataKey="Dora" fill="#BA3E2B" />
-      <Bar dataKey="Carlos" fill="#9e3e2f" />
-      <Bar dataKey="Rodrigo" fill="#66210E" />
+      <Bar dataKey="Daniela" fill="#BEE9E8" />
+      <Bar dataKey="Dora" fill="#62B6CB" />
+      <Bar dataKey="Carlos" fill="#CAE9FF" />
+      <Bar dataKey="Rodrigo" fill="#5FA8D3" />
     </BarChart> 
   </ResponsiveContainer>
   </div>
@@ -515,12 +526,23 @@ const toggleNotifications = () => {
         <CartesianGrid strokeDasharray="3 3" stroke="#444" />
         <XAxis dataKey="sprint" stroke="#ccc" />
         <YAxis stroke="#ccc" />
-        <Tooltip />
+        <Tooltip 
+         contentStyle={{
+            backgroundColor: "#2a2a2a",  // fondo oscuro
+            borderColor: "#62B6CB",     // borde azul
+            borderRadius: "8px",
+            color: "#ffffff",           // color de texto
+          }}
+           labelStyle={{
+            color: "#ffffff", 
+            fontWeight: "bold"
+          }}
+        />
         <Legend />
-        <Bar dataKey="Daniela" fill="#A7322C" />
-        <Bar dataKey="Dora" fill="#BA3E2B" />
-        <Bar dataKey="Carlos" fill="#9e3e2f" />
-        <Bar dataKey="Rodrigo" fill="#66210E" />
+        <Bar dataKey="Daniela" fill="#BEE9E8" />
+        <Bar dataKey="Dora" fill="#62B6CB" />
+        <Bar dataKey="Carlos" fill="#CAE9FF" />
+        <Bar dataKey="Rodrigo" fill="#5FA8D3" />
       </BarChart>
     </ResponsiveContainer>
   </div>
@@ -536,8 +558,8 @@ const toggleNotifications = () => {
           <AreaChart data={totalHoursBySprint}>
             <defs>
               <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#DD4F3A" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#DD4F3A" stopOpacity={0} />
+                <stop offset="5%" stopColor="#BEE9E8" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="#BEE9E8" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#444" />
@@ -549,12 +571,23 @@ const toggleNotifications = () => {
               height={60} 
             />
             <YAxis stroke="#ccc" />
-            <Tooltip />
+            <Tooltip 
+            contentStyle={{
+            backgroundColor: "#2a2a2a",  // fondo oscuro
+            borderColor: "#62B6CB",     // borde azul
+            borderRadius: "8px",
+            color: "#ffffff",           // color de texto
+          }}
+       labelStyle={{
+            color: "#ffffff", 
+            fontWeight: "bold"
+          }}
+            />
             <Legend />
             <Area 
               type="monotone" 
               dataKey="hours" 
-              stroke="#DD4F3A" 
+              stroke="#BEE9E8" 
               fillOpacity={1} 
               fill="url(#colorHours)" 
               name="Total Hours" 
