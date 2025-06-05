@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from "react";
-import Sidebar from "./components/Sidebar";
 import Dropdown from "./components/DropDown";
 import { ResponsiveContainer, RadialBarChart, RadialBar } from "recharts";
 import {

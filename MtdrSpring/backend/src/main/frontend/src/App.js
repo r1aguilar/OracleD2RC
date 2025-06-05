@@ -6,6 +6,8 @@ import DashDev from "./DashDev";
 import BacklogManager from "./BacklogManager";
 import AnalyticsManager from "./Analytics";
 import DashManager from "./DashManager";
+import ProfileManager from "./ProfileManager";
+import ProfileDev from "./ProfileDev";
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
       <Route path="/dashmanager" element={<DashManager />} />
       <Route path="/backlogMan" element={<BacklogManager />} />
       <Route path="/analytics" element={<AnalyticsManager />} />
+      <Route path="/profileManager" element={<ProfileManager/>} />
+      <Route path="/profileDev" element={<ProfileDev />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

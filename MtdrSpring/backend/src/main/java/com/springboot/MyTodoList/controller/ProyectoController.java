@@ -60,6 +60,7 @@ public class ProyectoController {
     public List<Proyecto> getProyectosForManager(@PathVariable int idUser){
         return proeyctoService.findAllProjectsForManager(idUser);
     }
+    
 
     @GetMapping(value = "/UsuariosProyecto/{idProy}")
     public List<Usuario> getAllUsersFromProyecto(@PathVariable int idProy){
@@ -82,6 +83,20 @@ public class ProyectoController {
         Proyecto dbProyecto = proeyctoService.addProyecto(Proyecto_p);
         HttpHeaders responseHeaders = new HttpHeaders();
         responseHeaders.set("location",""+dbProyecto.getID());
+        responseHeaders.set("Access-Control-Expose-Headers","location");
+        //URI location = URI.create(""+td.getID())
+
+        return ResponseEntity.ok()
+                .headers(responseHeaders).build();
+    }
+
+    @PostMapping(value = "/addIntegrante/{idUser}/{idProy}")
+    public ResponseEntity addIntegrante(@PathVariable int idUser, @PathVariable int idProy) throws Exception{
+        Equipo equipo = equipoService.findEquipoByIdProyecto(idProy).getBody();
+        IntegrantesEquipo integranteNuevo = new IntegrantesEquipo(idUser, equipo.getIdEquipo(), 1);
+        IntegrantesEquipo integranteNuevo_p = integrantesEquipoService.addEquipo(integranteNuevo);
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.set("location",""+ integranteNuevo_p.getIdUsuario());
         responseHeaders.set("Access-Control-Expose-Headers","location");
         //URI location = URI.create(""+td.getID())
 

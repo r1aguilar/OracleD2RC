@@ -15,7 +15,7 @@ const navItems = [
   { icon: <LayoutDashboard size={20} />, label: "Dashboard", path: "/dashmanager" },
   { icon: <Folder size={20} />, label: "Backlog", path: "/backlogMan" },
   { icon: <FileChartPie size={20} />, label: "Analytics", path: "/analytics" },
-  { icon: <User size={20} />, label: "Profile", path: "/profile" }, // add your real route
+  { icon: <User size={20} />, label: "Profile", path: "/profileManager" }, // add your real route
   { icon: <LogOut size={20} />, label: "Logout", path: "/logout" }, // or handle logout differently
 ];
 

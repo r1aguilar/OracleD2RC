@@ -4,18 +4,28 @@ import {
   LayoutDashboard,
   Folder,
   LogOut,
-  FileChartPie,
   User,
 } from "lucide-react";
 import taskoLogo from "../Assets/tasko.png";
+import { useNavigate } from "react-router-dom";
 
 const navItems = [
-  { icon: <LayoutDashboard size={20} />, label: "Dashboard" },
-  { icon: <Folder size={20} />, label: "Backlog" },
-  { icon: <LogOut size={20} />, label: "Logout" },
+  { icon: <LayoutDashboard size={20} />, label: "Dashboard", path: "/dashdev" },
+  { icon: <Folder size={20} />, label: "Backlog", path: "/backlogMan" },
+  { icon: <User size={20} />, label: "Profile", path: "/profileDev" },
+  { icon: <LogOut size={20} />, label: "Logout", path: "/login" },
 ];
 
 const Sidebar = ({ isMobileOpen, closeMobile }) => {
+  const navigate = useNavigate();
+
+  const handleNavigation = (path) => {
+    if (path) {
+      navigate(path);
+      if (closeMobile) closeMobile();
+    }
+  };
+
   return (
     <aside
       className={`${
@@ -27,11 +37,11 @@ const Sidebar = ({ isMobileOpen, closeMobile }) => {
       <img src={taskoLogo} alt="Tasko Logo" className="w-14 md:w-20 mb-6 transition-all duration-300" />
 
       <nav className="flex flex-col gap-6 w-full items-center group-hover:items-start">
-        {navItems.map(({ icon, label }, idx) => (
+        {navItems.map(({ icon, label, path }, idx) => (
           <div
             key={idx}
             className="flex items-center gap-4 text-sm cursor-pointer text-white hover:text-red-500 w-full px-2"
-            onClick={closeMobile}
+            onClick={() => handleNavigation(path)}
           >
             {icon}
             <span className="whitespace-nowrap hidden group-hover:inline-block">
