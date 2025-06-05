@@ -8,14 +8,18 @@ import {
   User,
 } from "lucide-react";
 import taskoLogo from "../Assets/tasko.png";
+import { useNavigate } from "react-router-dom";
 
 const navItems = [
-  { icon: <LayoutDashboard size={20} />, label: "Dashboard" },
-  { icon: <Folder size={20} />, label: "Backlog" },
-  { icon: <LogOut size={20} />, label: "Logout" },
+  { icon: <LayoutDashboard size={20} />, label: "Dashboard", path: "/dashdev" },
+  { icon: <Folder size={20} />, label: "Backlog", path: "/backlogDev"},
+  { icon: <User size={20} />, label: "Profile", path: "/profile" }, // add your real route
+  { icon: <LogOut size={20} />, label: "Logout", path: "/logout" },
 ];
 
 const Sidebar = ({ isMobileOpen, closeMobile }) => {
+  const navigate = useNavigate();
+
   return (
     <aside
       className={`${
@@ -27,11 +31,14 @@ const Sidebar = ({ isMobileOpen, closeMobile }) => {
       <img src={taskoLogo} alt="Tasko Logo" className="w-14 md:w-20 mb-6 transition-all duration-300" />
 
       <nav className="flex flex-col gap-6 w-full items-center group-hover:items-start">
-        {navItems.map(({ icon, label }, idx) => (
+        {navItems.map(({ icon, label, path }, idx) => (
           <div
             key={idx}
             className="flex items-center gap-4 text-sm cursor-pointer text-white hover:text-red-500 w-full px-2"
-            onClick={closeMobile}
+            onClick={() => {
+              closeMobile(); // close on mobile
+              navigate(path); // go to route
+            }}
           >
             {icon}
             <span className="whitespace-nowrap hidden group-hover:inline-block">

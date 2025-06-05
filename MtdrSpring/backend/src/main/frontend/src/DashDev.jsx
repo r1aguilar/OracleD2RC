@@ -109,21 +109,20 @@ const TaskList = ({ columnId, tasks, onTaskClick, sprints }) => {
 const DroppableColumn = ({ id, title, tasksCount, children, isOver }) => {
   return (
     <section
-      className={`bg-[#2a2a2a] text-white rounded-lg p-4 flex flex-col ${
+      className={`bg-[#2a2a2a] text-white rounded-lg p-4 flex flex-col h-[calc(100vh-200px)] ${
         isOver ? "ring-2 ring-red-500 bg-[#3a3a3a]" : ""
       }`}
       data-column-id={id}
     >
-      <h2 className="text-lg font-semibold mb-2 capitalize">
+      <h2 className="text-lg font-semibold mb-2 capitalize flex-shrink-0">
         {title} ({tasksCount})
       </h2>
-      <div className="flex-grow min-h-[100px] space-y-3">
+      <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
         {children}
       </div>
     </section>
   );
 };
-
 const DashDev = () => {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState({ pending: [], doing: [], done: [] });
@@ -133,11 +132,13 @@ const DashDev = () => {
   const [activeId, setActiveId] = useState(null);
   const [activeTask, setActiveTask] = useState(null);
   const [overColumnId, setOverColumnId] = useState(null);
-  const [originalTaskLocations, setOriginalTaskLocations] = useState({});
   const [sprints, setSprints] = useState([]);
   const [selectedSprints, setSelectedSprints] = useState(new Set());
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showHoursModal, setShowHoursModal] = useState(false);
+  const [pendingTaskMove, setPendingTaskMove] = useState(null);
+  const [realHours, setRealHours] = useState('');
 
   const formatToOffsetDateTime = (dateString) => {
     const date = new Date(dateString);
@@ -155,6 +156,25 @@ const DashDev = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  function getCurrentDateWithMinusSixOffset() {
+    const now = new Date();
+
+    const pad = (n) => n.toString().padStart(2, '0');
+
+    // Calculate the adjusted time for -06:00 offset
+    let adjustedDate = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+
+    const year = adjustedDate.getUTCFullYear();
+    const month = pad(adjustedDate.getUTCMonth() + 1);
+    const day = pad(adjustedDate.getUTCDate());
+    const hours = pad(adjustedDate.getUTCHours());
+    const minutes = pad(adjustedDate.getUTCMinutes());
+    const seconds = pad(adjustedDate.getUTCSeconds());
+
+    // Return formatted string with fixed -06:00 timezone offset
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}-06:00`;
+  }
+
   const fetchTasks = useCallback(async () => {
     const userData = JSON.parse(localStorage.getItem("userData"));
     const userId = userData?.id;
@@ -166,7 +186,6 @@ const DashDev = () => {
 
       const data = await res.json();
       const newTasks = { pending: [], doing: [], done: [] };
-      const newOriginalLocations = {};
 
       data.forEach((task) => {
         const taskObj = {
@@ -191,13 +210,11 @@ const DashDev = () => {
         const column = columnNames[task.idColumna];
         if (column) {
           newTasks[column].push(taskObj);
-          newOriginalLocations[taskObj.id] = column;
         }
       });
 
       setTasks(newTasks);
       setAllTasks(newTasks);
-      setOriginalTaskLocations(newOriginalLocations);
     } catch (err) {
       console.error(err);
       navigate("/login");
@@ -218,12 +235,16 @@ const DashDev = () => {
       );
       
       setSprints(validSprints);
-      
-      const initialSelectedSprints = new Set(
-        validSprints
-          .map(sprint => Number(sprint.id))
-          .filter(id => !isNaN(id))
+
+      const firstIncompleteSprint = validSprints.find(
+        sprint => sprint.completado === false
       );
+
+      const initialSelectedSprints = new Set(
+        firstIncompleteSprint ? [Number(firstIncompleteSprint.id)] : []
+      );
+
+      console.log(initialSelectedSprints)
       
       setSelectedSprints(initialSelectedSprints);
     } catch (err) {
@@ -385,6 +406,30 @@ const DashDev = () => {
     }
   };
 
+  const handleDeleteTask = async (deletedTask) => {
+    try {
+      const response = await fetch(`/pruebas/deleteTarea/${deletedTask.rawId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token") || ''}`,
+        },
+      });
+
+      const deletedFlag = await response.json();
+
+      if (deletedFlag === true) {
+        // Refetch task lists
+        fetchTasks();
+      } else {
+        console.warn("Deletion did not return true. Response:", deletedFlag);
+      }
+    } catch (error) {
+      console.error("Error al borrar:", error);
+      throw error;
+    }
+  };
+
   const handleDragStart = ({ active }) => {
     const column = findColumn(active.id);
     if (!column) return;
@@ -392,11 +437,6 @@ const DashDev = () => {
     const task = tasks[column].find((t) => t.id === active.id);
     setActiveId(active.id);
     setActiveTask(task || null);
-    
-    setOriginalTaskLocations(prev => ({
-      ...prev,
-      [active.id]: column
-    }));
   };
 
   const handleDragOver = ({ active, over }) => {
@@ -411,25 +451,8 @@ const DashDev = () => {
     
     setOverColumnId(overColumn);
     
-    const activeColumn = findColumn(active.id);
-    
-    if (!activeColumn || !overColumn || activeColumn === overColumn) return;
-    
-    setTasks(prevTasks => {
-      const activeItems = [...prevTasks[activeColumn]];
-      const overItems = [...prevTasks[overColumn]];
-      
-      const activeIndex = activeItems.findIndex(item => item.id === active.id);
-      if (activeIndex === -1) return prevTasks;
-      
-      const taskToMove = { ...activeItems[activeIndex] };
-      
-      return {
-        ...prevTasks,
-        [activeColumn]: activeItems.filter(item => item.id !== active.id),
-        [overColumn]: [...overItems, taskToMove]
-      };
-    });
+    // Remove the premature state update that was causing the issue
+    // Just track which column we're over for visual feedback
   };
 
   const handleDragEnd = async ({ active, over }) => {
@@ -441,7 +464,7 @@ const DashDev = () => {
       return;
     }
 
-    const sourceColumn = originalTaskLocations[active.id];
+    const sourceColumn = findColumn(active.id);
     let targetColumn = null;
 
     if (["pending", "doing", "done"].includes(over.id)) {
@@ -470,7 +493,23 @@ const DashDev = () => {
       return;
     }
 
+    // Check if moving to "done" column
+    if (targetColumn === 'done' && sourceColumn !== 'done') {
+      // Show hours input modal
+      setPendingTaskMove({
+        originalTask,
+        sourceColumn,
+        targetColumn
+      });
+      setRealHours(originalTask.tiempoReal?.toString() || '');
+      setShowHoursModal(true);
+      setActiveId(null);
+      setActiveTask(null);
+      return;
+    }
+
     if (sourceColumn === targetColumn) {
+      // Handle reordering within the same column
       if (over.id !== targetColumn) {
         const activeIndex = tasks[sourceColumn].findIndex(task => task.id === active.id);
         const overIndex = tasks[targetColumn].findIndex(task => task.id === over.id);
@@ -479,37 +518,36 @@ const DashDev = () => {
             ...prev,
             [sourceColumn]: arrayMove(prev[sourceColumn], activeIndex, overIndex),
           }));
+          setAllTasks(prev => ({
+            ...prev,
+            [sourceColumn]: arrayMove(prev[sourceColumn], activeIndex, overIndex),
+          }));
         }
       }
     } else {
+      // Handle moving between columns (not to done)
       const targetColumnId = columnMap[targetColumn];
       
+      const updatedTask = { 
+        ...originalTask, 
+        idColumna: targetColumnId,
+        tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : null
+      };
+
+      // Update both tasks and allTasks state
       setTasks(prev => ({
         ...prev,
         [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
-        [targetColumn]: [...prev[targetColumn], { 
-          ...originalTask, 
-          idColumna: targetColumnId,
-          // Resetear horas reales si se mueve fuera de "done"
-          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : null
-        }]
+        [targetColumn]: [...prev[targetColumn], updatedTask]
       }));
       
       setAllTasks(prev => ({
         ...prev,
         [sourceColumn]: prev[sourceColumn].filter(task => task.id !== active.id),
-        [targetColumn]: [...prev[targetColumn], { 
-          ...originalTask, 
-          idColumna: targetColumnId,
-          tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : null
-        }]
+        [targetColumn]: [...prev[targetColumn], updatedTask]
       }));
 
-      setOriginalTaskLocations(prev => ({
-        ...prev,
-        [active.id]: targetColumn,
-      }));
-
+      // Update the server
       try {
         const response = await fetch(`/pruebas/updateTarea/${originalTask.rawId}`, {
           method: "PUT",
@@ -528,9 +566,9 @@ const DashDev = () => {
             prioridad: originalTask.prioridad,
             fechaInicio: originalTask.fechaInicio,
             fechaVencimiento: originalTask.fechaVencimiento,
-            fechaCompletado: originalTask.fechaCompletado,
+            fechaCompletado: targetColumn === 'done' ? getCurrentDateWithMinusSixOffset() : null,
             storyPoints: originalTask.storyPoints,
-            tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : 0,
+            tiempoReal: targetColumn === 'done' ? originalTask.tiempoReal : null,
             tiempoEstimado: originalTask.tiempoEstimado,
             aceptada: originalTask.aceptada,
           }),
@@ -541,12 +579,96 @@ const DashDev = () => {
         }
       } catch (error) {
         console.error("Failed to update task:", error);
+        // Revert the state on error
         fetchTasks();
       }
     }
 
     setActiveId(null);
     setActiveTask(null);
+  };
+
+  const handleCancelHours = () => {
+    setShowHoursModal(false);
+    setPendingTaskMove(null);
+    setRealHours('');
+  };
+
+  const handleSaveHours = async () => {
+    if (!pendingTaskMove) return;
+
+    const hours = parseFloat(realHours);
+    if (isNaN(hours) || hours < 0) {
+      alert('Please enter a valid number of hours');
+      return;
+    }
+
+    const { originalTask, sourceColumn, targetColumn } = pendingTaskMove;
+    const targetColumnId = columnMap[targetColumn];
+    
+    const updatedTask = { 
+      ...originalTask, 
+      idColumna: targetColumnId,
+      tiempoReal: hours
+    };
+
+    // Update both tasks and allTasks state
+    setTasks(prev => ({
+      ...prev,
+      [sourceColumn]: prev[sourceColumn].filter(task => task.id !== originalTask.id),
+      [targetColumn]: [...prev[targetColumn], updatedTask]
+    }));
+    
+    setAllTasks(prev => ({
+      ...prev,
+      [sourceColumn]: prev[sourceColumn].filter(task => task.id !== originalTask.id),
+      [targetColumn]: [...prev[targetColumn], updatedTask]
+    }));
+
+    var bodyToSend = JSON.stringify({
+      idTarea: originalTask.rawId,
+      idEncargado: originalTask.idEncargado,
+      idProyecto: originalTask.idProyecto,
+      idColumna: targetColumnId,
+      idSprint: originalTask.idSprint,
+      nombre: originalTask.title,
+      descripcion: originalTask.description,
+      prioridad: originalTask.prioridad,
+      fechaInicio: originalTask.fechaInicio,
+      fechaVencimiento: originalTask.fechaVencimiento,
+      fechaCompletado: getCurrentDateWithMinusSixOffset(),
+      storyPoints: originalTask.storyPoints,
+      tiempoReal: hours,
+      tiempoEstimado: originalTask.tiempoEstimado,
+      aceptada: originalTask.aceptada,
+    });
+
+    console.log(bodyToSend)
+
+    // Update the server
+    try {
+      const response = await fetch(`/pruebas/updateTarea/${originalTask.rawId}`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token") || ''}`
+        },
+        body: bodyToSend,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Failed to update task:", error);
+      // Revert the state on error
+      fetchTasks();
+    }
+
+    // Close modal and reset state
+    setShowHoursModal(false);
+    setPendingTaskMove(null);
+    setRealHours('');
   };
 
   const progress =
@@ -609,23 +731,37 @@ const DashDev = () => {
               </DroppableColumn>
             ))}
 
-            <section className="bg-[#2a2a2a] text-white rounded-lg p-4">
-              <h2 className="text-lg font-semibold mb-2">Progress</h2>
-              <div className="w-full flex items-center justify-center mb-4 relative">
-                <ResponsiveContainer width="100%" height={120}>
-                  <RadialBarChart innerRadius="70%" outerRadius="100%" barSize={10} data={[{ value: progress, fill: "#ff1f1f" }]}>
-                    <RadialBar minAngle={15} background clockWise dataKey="value" />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <span className="absolute text-xl font-bold text-white">{progress}%</span>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Tasks Left</h3>
-                <ul className="space-y-2">
-                  <li className="bg-[#1a1a1a] px-4 py-2 rounded">Today</li>
-                  <li className="bg-[#1a1a1a] px-4 py-2 rounded">Tomorrow</li>
-                  <li className="bg-[#1a1a1a] px-4 py-2 rounded">Wednesday</li>
-                </ul>
+            <section className="bg-[#2a2a2a] text-white rounded-lg p-4 flex flex-col h-[calc(100vh-200px)]">
+              <h2 className="text-lg font-semibold mb-4 flex-shrink-0">Progress</h2>
+              <div className="flex-1 flex items-center justify-center relative min-h-0">
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <div className="w-full h-full max-w-[min(100%,100vh)] max-h-[min(100%,100vw)] aspect-square">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart
+                        innerRadius="60%"
+                        outerRadius="90%"
+                        barSize={15}
+                        data={[
+                          { name: "Progress", value: progress, fill: "#ff1f1f" },
+                        ]}
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        <RadialBar 
+                          minAngle={15} 
+                          background={{ fill: "#444" }} 
+                          clockWise 
+                          dataKey="value" 
+                        />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
+                      {progress}%
+                    </span>
+                  </div>
+                </div>
               </div>
             </section>
           </main>
@@ -653,7 +789,50 @@ const DashDev = () => {
           sprints={sprints}
           onClose={() => setShowTaskModal(false)}
           onSave={handleSaveTask}
+          onDelete={handleDeleteTask}
         />
+      )}
+
+      {showHoursModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#2a2a2a] rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-white text-xl font-semibold mb-4">Input Real Hours</h2>
+            <p className="text-gray-300 mb-4">
+              Please enter the actual hours spent on task: <span className="font-medium">{pendingTaskMove?.originalTask?.title}</span>
+            </p>
+            
+            <div className="mb-6">
+              <label className="block text-white text-sm font-medium mb-2">
+                Real Hours *
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={realHours}
+                onChange={(e) => setRealHours(e.target.value)}
+                className="w-full px-3 py-2 bg-[#1a1a1a] border border-gray-600 rounded-lg text-white focus:border-red-500 focus:outline-none"
+                placeholder="Enter hours (e.g., 2.5)"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={handleCancelHours}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveHours}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

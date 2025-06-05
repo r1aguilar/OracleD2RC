@@ -1,45 +1,69 @@
 import React, { useState, useEffect } from "react";
 
-const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
-  const [editedTask, setEditedTask] = useState({ ...task });
+const CreateTaskDeveloperModal = ({sprint, idProy, sprints, onClose, onSave }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [sprintInfo, setSprintInfo] = useState(null);
   const [minDate, setMinDate] = useState("");
   const [maxDate, setMaxDate] = useState("");
   const [error, setError] = useState(null);
 
-  // Determinar si la tarea está en estado "done" (columna 3)
-  const isDone = task.idColumna === 3;
+  var task = {
+    idEncargado: null,
+    idProyecto: sprints[0]?.idProyecto || idProy,
+    idColumna: 1,
+    idSprint: sprint,
+    nombre: null,
+    descripcion: null,
+    prioridad: 1,
+    fechaInicio: null,
+    fechaVencimiento: null,
+    storyPoints: null,
+    tiempoReal: null,
+    tiempoEstimado: null,
+    aceptada: 1,
+  }
 
-  var task = 
+  const [editedTask, setEditedTask] = useState({ ...task });
+
+  const toUTC6EndOfDay = (dateString) => {
+    return `${dateString}T23:59:59-06:00`;
+  };
 
   useEffect(() => {
-    if (task?.idSprint && sprints?.length > 0) {
-      const foundSprint = sprints.find(s => Number(s.id) === Number(task.idSprint));
-      if (foundSprint) {
-        setSprintInfo(foundSprint);
-        
-        if (foundSprint.fechaInicio && foundSprint.fechaFin) {
-          // Convertir a formato YYYY-MM-DD para los inputs de fecha
-          const startDate = new Date(foundSprint.fechaInicio);
-          const endDate = new Date(foundSprint.fechaFin);
-          
-          setMinDate(startDate.toISOString().split('T')[0]);
-          setMaxDate(endDate.toISOString().split('T')[0]);
-          
-          // Validar fecha actual
-          const currentDueDate = new Date(task.fechaVencimiento);
-          if (currentDueDate < startDate || currentDueDate > endDate) {
-            const correctedDate = currentDueDate < startDate ? startDate : endDate;
-            setEditedTask(prev => ({
-              ...prev,
-              fechaVencimiento: correctedDate.toISOString()
-            }));
-          }
-        }
-      }
+    if (!sprint || !sprints?.length) return;
+
+    console.log("Checking for " + sprint)
+    const foundSprint = sprints.find(s => Number(s.id) === Number(sprint));
+    if (!foundSprint) return;
+
+    setSprintInfo(foundSprint);
+
+    if (foundSprint.fechaInicio && foundSprint.fechaFin) {
+      const startDate = new Date(foundSprint.fechaInicio);
+      const endDate = new Date(foundSprint.fechaFin);
+      setMinDate(startDate.toISOString().split('T')[0]);
+      setMaxDate(endDate.toISOString().split('T')[0]);
+
+      setEditedTask(prev => {
+        const dueDate = new Date(prev.fechaVencimiento || endDate.toISOString());
+
+        const correctedDate =
+          dueDate < startDate ? startDate :
+          dueDate > endDate ? endDate :
+          dueDate;
+
+        return {
+          ...prev,
+          fechaInicio: startDate.toISOString(),
+          fechaVencimiento: correctedDate.toISOString()
+        };
+      });
     }
-  }, [task, sprints]);
+  }, [sprint, sprints]);
+
+  useEffect(() => {
+    console.log("Edited Task updated:", editedTask);
+  }, [editedTask]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -55,22 +79,16 @@ const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
     if (value === '' || (/^\d+$/.test(value) && parseInt(value) >= 0)) {
       setEditedTask(prev => ({
         ...prev,
-        tiempoReal: value === '' ? '' : parseInt(value)
+        tiempoEstimado: value === '' ? '' : parseInt(value)
       }));
     }
   };
 
   const handleDateChange = (e) => {
     const { value } = e.target;
-    // Convertir a formato ISO con offset -06:00
-    const date = new Date(value);
-    const timezoneOffset = -360; // -6 horas en minutos
-    date.setMinutes(date.getMinutes() - date.getTimezoneOffset() + timezoneOffset);
-    const isoStringWithOffset = date.toISOString().replace('Z', '-06:00');
-    
     setEditedTask(prev => ({
       ...prev,
-      fechaVencimiento: isoStringWithOffset
+      fechaVencimiento: toUTC6EndOfDay(value)
     }));
   };
 
@@ -95,15 +113,7 @@ const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
         const endDate = new Date(sprintInfo.fechaFin);
         
         if (dueDate < startDate || dueDate > endDate) {
-          throw new Error(`La fecha debe estar entre ${startDate.toLocaleDateString()} y ${endDate.toLocaleDateString()}`);
-        }
-      }
-
-      // Validación de horas reales si está en done
-      if (isDone) {
-        const horasReales = parseInt(editedTask.tiempoReal);
-        if (isNaN(horasReales) || horasReales < 0) {
-          throw new Error("Las horas reales deben ser un número entero positivo");
+          throw new Error(`La fecha debe estar entre ${startDate} y ${endDate}`);
         }
       }
 
@@ -123,7 +133,7 @@ const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-[#2a2a2a] rounded-lg p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-white">Detalles de la Tarea</h2>
+          <h2 className="text-xl font-semibold text-white">Propose Task</h2>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-white"
@@ -141,11 +151,11 @@ const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Nombre</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
               <input
                 type="text"
-                name="title"
-                value={editedTask.title}
+                name="nombre"
+                value={editedTask.nombre}
                 onChange={handleChange}
                 className="w-full bg-[#1a1a1a] border border-gray-600 rounded px-3 py-2 text-white"
                 required
@@ -153,11 +163,12 @@ const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Descripción</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
               <textarea
-                name="description"
-                value={editedTask.description}
+                name="descripcion"
+                value={editedTask.descripcion}
                 onChange={handleChange}
+                required
                 className="w-full bg-[#1a1a1a] border border-gray-600 rounded px-3 py-2 text-white"
                 rows="3"
               />
@@ -165,26 +176,32 @@ const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Fecha de Inicio</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Start Date</label>
                 <input
                   type="date"
-                  value={task.fechaInicio ? new Date(task.fechaInicio).toISOString().split('T')[0] : ''}
+                  value={editedTask.fechaInicio ? new Date(editedTask.fechaInicio).toISOString().split('T')[0] : ''}
                   readOnly
-                  className="w-full bg-[#333] border border-gray-600 rounded px-3 py-2 text-gray-400 cursor-not-allowed"
+                  disabled={!editedTask.idSprint}
+                  className={`w-full border rounded px-3 py-2 cursor-not-allowed bg-[#333] text-gray-400 border-gray-600`}
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Fecha de Vencimiento</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">End Date</label>
                 <input
                   type="date"
                   name="fechaVencimiento"
                   value={editedTask.fechaVencimiento ? new Date(editedTask.fechaVencimiento).toISOString().split('T')[0] : ''}
-                  onChange={handleDateChange}
-                  min={minDate}
+                  onChange={editedTask.idSprint ? handleDateChange : undefined}
+                  min={editedTask.fechaInicio ? new Date(editedTask.fechaInicio).toISOString().split('T')[0] : minDate}
                   max={maxDate}
-                  className="w-full bg-[#1a1a1a] border border-gray-600 rounded px-3 py-2 text-white"
-                  required
+                  disabled={!editedTask.idSprint}
+                  className={`w-full border rounded px-3 py-2 ${
+                    editedTask.idSprint
+                      ? 'bg-[#1a1a1a] text-white border-gray-600'
+                      : 'bg-[#333] text-gray-400 cursor-not-allowed border-gray-600'
+                  }`}
+                  required={!!editedTask.idSprint}
                 />
                 {sprintInfo && (
                   <p className="text-xs text-gray-400 mt-1">
@@ -196,33 +213,30 @@ const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Tiempo Estimado (horas)</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Estimated Time (hours)</label>
                 <input
                   type="number"
-                  value={task.tiempoEstimado || 'N/A'}
-                  readOnly
-                  className="w-full bg-[#333] border border-gray-600 rounded px-3 py-2 text-gray-400 cursor-not-allowed"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Horas Reales {!isDone && '(Solo para tareas completadas)'}
-                </label>
-                <input
-                  type="number"
-                  name="tiempoReal"
-                  value={editedTask.tiempoReal || ''}
+                  name="tiempoEstimado"
+                  value={editedTask.tiempoEstimado || ''}
                   onChange={handleHoursChange}
                   min="0"
                   step="1"
-                  className={`w-full border rounded px-3 py-2 ${
-                    isDone 
-                      ? 'bg-[#1a1a1a] border-gray-600 text-white' 
-                      : 'bg-[#333] border-gray-600 text-gray-400 cursor-not-allowed'
-                  }`}
-                  disabled={!isDone}
-                  required={isDone}
+                  className="w-full bg-[#1a1a1a] border border-gray-600 rounded px-3 py-2 text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Story Points</label>
+                <input
+                  type="number"
+                  name="storyPoints"
+                  value={editedTask.storyPoints || ''}
+                  onChange={handleChange}
+                  min="0"
+                  step="1"
+                  className="w-full bg-[#1a1a1a] border border-gray-600 rounded px-3 py-2 text-white"
+                  required
                 />
               </div>
             </div>
@@ -268,7 +282,7 @@ const CreateTaskDeveloperModal = ({sprints, onClose, onSave }) => {
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
               disabled={isSaving}
             >
-              {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+              {isSaving ? 'Saving...' : 'Create Task'}
             </button>
           </div>
         </form>

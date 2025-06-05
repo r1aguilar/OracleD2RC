@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import SidebarManager from "./components/SidebarManager";
 import Dropdown from "./components/DropDown";
-import AcceptTaskModal from "./components/AcceptTaskModal";
+import ManagerEditTaskModal from "./components/ManagerEditTaskModal";
 import { ResponsiveContainer, RadialBarChart, RadialBar } from "recharts";
 import {
   DndContext,
@@ -178,9 +178,13 @@ const DashManager = () => {
         idSprint: task.idSprint,
         title: task.nombre,
         description: task.descripcion,
+        storyPoints: task.storyPoints,
+        tiempoReal: task.tiempoReal,
+        tiempoEstimado: task.tiempoEstimado,
         fechaInicio: task.fechaInicio,
         fechaVencimiento: task.fechaVencimiento,
         prioridad: task.prioridad,
+        aceptada: task.aceptada,
         type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
       }));
 
@@ -257,7 +261,7 @@ const DashManager = () => {
           fechaVencimiento: task.fechaVencimiento,
           fechaCompletado: task.fechaCompletado,
           storyPoints: task.storyPoints,
-          tiempoReal: task.tiempoReal || 0,
+          tiempoReal: task.tiempoReal,
           tiempoEstimado: task.tiempoEstimado,
           prioridad: task.prioridad,
           aceptada: task.aceptada || 1,
@@ -511,8 +515,8 @@ const DashManager = () => {
         description: responseData.descripcion || updatedTask.description
       };
 
-      setTasks(prev => updateTaskState(prev, updatedTaskData));
-      setAllTasks(prev => updateTaskState(prev, updatedTaskData));
+      await fetchTasks();
+      await fetchNotAcceptedTasks();
 
       return responseData;
     } catch (error) {
@@ -535,8 +539,8 @@ const DashManager = () => {
 
       if (deletedFlag === true) {
         // Refetch task lists
-        fetchTasks();
-        fetchNotAcceptedTasks();
+        await fetchTasks();
+        await fetchNotAcceptedTasks();
       } else {
         console.warn("Deletion did not return true. Response:", deletedFlag);
       }
@@ -614,50 +618,58 @@ const DashManager = () => {
         <section className="bg-[#2a2a2a] text-white rounded-lg p-4 mb-6 overflow-hidden">
           <h2 className="text-lg font-semibold mb-4">Not Accepted Tasks</h2>
 
-          <div className="relative pb-6"> {/* Extra space for pagination */}
-            <Swiper
-              modules={[Pagination]}
-              pagination={{
-                clickable: true,
-                el: ".custom-swiper-pagination",
-              }}
-              spaceBetween={20}
-              slidesPerView="auto"
-              className="!overflow-hidden"
-              style={{ height: '150px' }}
-            >
-              {notAcceptedTasks.map((task) => (
-                <SwiperSlide
-                  key={task.id}
-                  className="!w-auto !flex-shrink-0"
-                >
-                  <div
-                    className="w-[260px] h-[150px] bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 cursor-pointer hover:border-red-500 transition-colors flex flex-col justify-between overflow-hidden"
-                    onClick={() => handleTaskClickNotAccepted(task)}
+          {notAcceptedTasks.length === 0 ? (
+            <div className="flex items-center justify-center h-32 bg-[#1a1a1a] rounded-lg border border-dashed border-gray-600">
+              <p className="text-gray-500">No Tasks To Accept</p>
+            </div>
+          ) : (
+            <div className="relative pb-6">
+              {/* Extra space for pagination */}
+              <Swiper
+                modules={[Pagination]}
+                pagination={{
+                  clickable: true,
+                  el: ".custom-swiper-pagination",
+                }}
+                spaceBetween={20}
+                slidesPerView="auto"
+                className="!overflow-hidden"
+                style={{ height: '150px' }}
+              >
+                {notAcceptedTasks.map((task) => (
+                  <SwiperSlide
+                    key={task.id}
+                    className="!w-auto !flex-shrink-0"
                   >
-                    <div>
-                      <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
-                        {task.type}
-                      </span>
-                      <h3 className="font-semibold text-white mt-2 break-words">
-                        {task.title}
-                      </h3>
-                      <p className="text-sm text-gray-400 break-words overflow-hidden text-ellipsis whitespace-nowrap">
-                        {task.description}
+                    <div
+                      className="w-[260px] h-[150px] bg-[#1a1a1a] rounded-lg p-4 shadow-md border border-neutral-700 cursor-pointer hover:border-red-500 transition-colors flex flex-col justify-between overflow-hidden"
+                      onClick={() => handleTaskClickNotAccepted(task)}
+                    >
+                      <div>
+                        <span className={`text-xs px-2 py-1 rounded-full text-white ${tagColors[task.type]}`}>
+                          {task.type}
+                        </span>
+                        <h3 className="font-semibold text-white mt-2 break-words">
+                          {task.title}
+                        </h3>
+                        <p className="text-sm text-gray-400 break-words overflow-hidden text-ellipsis whitespace-nowrap">
+                          {task.description}
+                        </p>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        {new Date(task.fechaVencimiento).toLocaleDateString()}
                       </p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {new Date(task.fechaVencimiento).toLocaleDateString()}
-                    </p>
-                  </div>
-                </SwiperSlide>
-              ))}
-            </Swiper>
+                  </SwiperSlide>
+                ))}
+              </Swiper>
 
-            {/* Custom pagination container BELOW swiper */}
-            <div className="custom-swiper-pagination flex justify-center mt-2" />
-          </div>
+              {/* Custom pagination container BELOW swiper */}
+              <div className="custom-swiper-pagination flex justify-center mt-2" />
+            </div>
+          )}
         </section>
+
 
 
         <DndContext
@@ -683,25 +695,40 @@ const DashManager = () => {
               </DroppableColumn>
             ))}
 
-            <section className="bg-[#2a2a2a] text-white rounded-lg p-4">
-              <h2 className="text-lg font-semibold mb-2">Progress</h2>
-              <div className="w-full flex items-center justify-center mb-4 relative">
-                <ResponsiveContainer width="100%" height={120}>
-                  <RadialBarChart innerRadius="70%" outerRadius="100%" barSize={10} data={[{ value: progress, fill: "#ff1f1f" }]}>
-                    <RadialBar minAngle={15} background clockWise dataKey="value" />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <span className="absolute text-xl font-bold text-white">{progress}%</span>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Tasks Left</h3>
-                <ul className="space-y-2">
-                  <li className="bg-[#1a1a1a] px-4 py-2 rounded">Today</li>
-                  <li className="bg-[#1a1a1a] px-4 py-2 rounded">Tomorrow</li>
-                  <li className="bg-[#1a1a1a] px-4 py-2 rounded">Wednesday</li>
-                </ul>
+            <section className="bg-[#2a2a2a] text-white rounded-lg p-4 flex flex-col h-[calc(100vh-200px)]">
+              <h2 className="text-lg font-semibold mb-4 flex-shrink-0">Progress</h2>
+              <div className="flex-1 flex items-center justify-center relative min-h-0">
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <div className="w-full h-full max-w-[min(100%,100vh)] max-h-[min(100%,100vw)] aspect-square">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart
+                        innerRadius="60%"
+                        outerRadius="90%"
+                        barSize={15}
+                        data={[
+                          { name: "Progress", value: progress, fill: "#ff1f1f" },
+                        ]}
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        <RadialBar 
+                          minAngle={15} 
+                          background={{ fill: "#444" }} 
+                          clockWise 
+                          dataKey="value" 
+                        />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
+                      {progress}%
+                    </span>
+                  </div>
+                </div>
               </div>
             </section>
+
           </main>
 
           <DragOverlay>
@@ -721,7 +748,7 @@ const DashManager = () => {
         </DndContext>
 
         {showTaskModal && (
-          <AcceptTaskModal
+          <ManagerEditTaskModal
             task={selectedTask}
             sprints={sprints}
             integrantes={integrantes}

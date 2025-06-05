@@ -7,15 +7,19 @@ import BacklogManager from "./BacklogManager";
 import AnalyticsManager from "./Analytics";
 import AnalyticsSprint from "./Analyticsbysprint";
 import DashManager from "./DashManager";
+import BacklogDeveloper from "./BacklogDeveloper";
+import Register from "./Register";
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<IntroWrapper />} />
       <Route path="/login" element={<LoginScreen />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/dashdev" element={<DashDev />} />
       <Route path="/dashmanager" element={<DashManager />} />
       <Route path="/backlogMan" element={<BacklogManager />} />
+      <Route path="/backlogDev" element={<BacklogDeveloper />} />
       <Route path="/analytics" element={<AnalyticsManager />} />
       <Route path="/analyticssprint" element={<AnalyticsSprint />} />
       <Route path="*" element={<Navigate to="/" />} />

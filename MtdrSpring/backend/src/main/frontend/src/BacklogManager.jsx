@@ -7,6 +7,7 @@ import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, DragOv
 import SprintColumn from "./components/SprintColumn";
 import CreateSprintModal from "./components/CreateSprintModal";
 import TaskChip from "./components/TaskChip";
+import CreateTaskManagerModal from "./components/CreateTaskManagerModal";
 
 
 
@@ -24,6 +25,9 @@ const BacklogManager = () => {
   const [isCreateSprintModalOpen, setIsCreateSprintModalOpen] = useState(false);
   const navigate = useNavigate();
   const [isChangingSprintStatus, setIsChangingSprintStatus] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [createTaskSprintId, setCreateTaskSprintId] = useState(null);
+  const [isSavingTask, setIsSavingTask] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor));
   const [activeTaskId, setActiveTaskId] = useState(null);
@@ -326,6 +330,68 @@ const BacklogManager = () => {
     }
   };
 
+  const handleOpenCreateTaskModel = (sprintId) => {
+    console.log("Changing createTaskSprintId")
+    setCreateTaskSprintId(sprintId.id);
+    setIsCreatingTask(true);
+  }
+
+  const handleAddTask = async (newTask) => {
+    const taskPayload = {
+      idEncargado: newTask.idEncargado,
+      idProyecto: newTask.idProyecto,
+      idColumna: newTask.idColumna,
+      idSprint: newTask.idSprint,
+      nombre: newTask.nombre,
+      descripcion: newTask.descripcion,
+      prioridad: newTask.prioridad,
+      fechaInicio: newTask.fechaInicio,
+      fechaVencimiento: newTask.fechaVencimiento,
+      storyPoints: newTask.storyPoints,
+      tiempoReal: newTask.tiempoReal,
+      tiempoEstimado: newTask.tiempoEstimado,
+      aceptada: 1,
+    };
+
+    try {
+      const response = await fetch("/pruebas/Tareas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(taskPayload),
+      });
+
+      if (!response.ok) throw new Error("Failed to add task");
+
+      const idTarea = response.headers.get("location");
+      if (!idTarea) throw new Error("No idTarea returned in response headers");
+
+      const formattedTask = {
+        id: `task-${Number(idTarea)}`,
+        rawId: Number(idTarea),
+        idEncargado: newTask.idEncargado,
+        idProyecto: newTask.idProyecto,
+        idColumna: newTask.idColumna,
+        idSprint: newTask.idSprint,
+        title: newTask.nombre,
+        description: newTask.descripcion,
+        fechaInicio: newTask.fechaInicio,
+        fechaVencimiento: newTask.fechaVencimiento,
+        fechaCompletado: null,
+        storyPoints: newTask.storyPoints,
+        tiempoReal: newTask.tiempoReal,
+        tiempoEstimado: newTask.tiempoEstimado,
+        prioridad: newTask.prioridad,
+        aceptada: 1,
+        type: newTask.prioridad === 1 ? "Low" : newTask.prioridad === 2 ? "Medium" : "High",
+      };
+
+      setTasks(prev => [...prev, formattedTask]);
+      setAllTasks(prev => [...prev, formattedTask]);
+    } catch (e) {
+      console.error("Error adding task:", e);
+    }
+  };
+
 
   return (
     <div className="flex h-screen bg-[#1a1a1a]">
@@ -386,6 +452,8 @@ const BacklogManager = () => {
                   onStatusChange={handleSprintStatusChange}
                   isDisabled={sprint.completado}
                   isChangingStatus={isChangingSprintStatus}
+                  setIsCreatingTask={handleOpenCreateTaskModel}
+                  isManager={true}
                 >
                   {tasks
                     .filter((task) => task.idSprint === sprint.id)
@@ -441,6 +509,20 @@ const BacklogManager = () => {
               onSave={(newSprint) => {
                 handleAddSprint(newSprint);
                 setIsCreateSprintModalOpen(false);
+              }}
+            />
+          )}
+
+          {isCreatingTask && (
+            <CreateTaskManagerModal
+              sprint={createTaskSprintId}
+              idProy={selectedProyecto}
+              sprints={sprints}
+              integrantes={integrantes}
+              onClose={() => setIsCreatingTask(false)}
+              onSave={async (newTask) => {
+                await handleAddTask(newTask); // Assume it's async
+                setIsCreatingTask(false);
               }}
             />
           )}

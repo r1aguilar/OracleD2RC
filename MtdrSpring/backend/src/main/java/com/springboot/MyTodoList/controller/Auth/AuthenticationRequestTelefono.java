@@ -7,11 +7,17 @@ import lombok.NoArgsConstructor;
 
 @Data
 @Builder
-@AllArgsConstructor
-@NoArgsConstructor
 public class AuthenticationRequestTelefono {
-    private String telefono;
+    String telefono;
     String password;
+
+    public AuthenticationRequestTelefono(String telefono_p, String pass) {
+        this.telefono = telefono_p;
+        this.password = pass;
+    }
+
+    public AuthenticationRequestTelefono() {
+    }
 
     public String getTelefono(){
         return this.telefono;

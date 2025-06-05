@@ -77,6 +77,32 @@ public class ProyectoController {
         return usuariosDelEquipo;
     }
 
+    @GetMapping(value = "/ProyectoUsuario/{idUser}")
+    public ResponseEntity<Integer> getProyectoFromUser(@PathVariable int idUser){
+        // Obtener el id del equipo a traves del proyecto
+        IntegrantesEquipo integrante = integrantesEquipoService.getItemByIdUsuario(idUser).getBody();
+
+        // A traves del id del equipo obtener la lista de integrantesEquipo
+        Equipo equipo = equipoService.getItemById(integrante.getIdEquipo()).getBody();
+
+        return new ResponseEntity<>(equipo.getIdProyecto(), HttpStatus.OK);
+    }
+
+    @PostMapping(value = "/addIntegrante/{idUser}/{idProy}")
+    public ResponseEntity addIntegrante(@PathVariable int idUser, @PathVariable int idProy) throws Exception{
+        Equipo equipo = equipoService.findEquipoByIdProyecto(idProy).getBody();
+        IntegrantesEquipo integranteNuevo = new IntegrantesEquipo(idUser, equipo.getIdEquipo(), 1);
+        IntegrantesEquipo integranteNuevo_p = integrantesEquipoService.addEquipo(integranteNuevo);
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.set("location",""+ integranteNuevo_p.getIdUsuario());
+        responseHeaders.set("Access-Control-Expose-Headers","location");
+        //URI location = URI.create(""+td.getID())
+
+        return ResponseEntity.ok()
+                .headers(responseHeaders).build();
+    }
+
+
     @PostMapping(value = "/Proyectos")
     public ResponseEntity addProyecto(@RequestBody Proyecto Proyecto_p) throws Exception{
         Proyecto dbProyecto = proeyctoService.addProyecto(Proyecto_p);

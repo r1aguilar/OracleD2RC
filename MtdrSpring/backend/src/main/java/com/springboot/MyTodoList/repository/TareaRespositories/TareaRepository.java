@@ -16,6 +16,7 @@ import com.springboot.MyTodoList.model.Tarea;
 @EnableTransactionManagement
 public interface TareaRepository extends JpaRepository<Tarea,Integer>, TareaRepositoryCustom {
     List<Tarea> findByAceptada(int aceptada);
+    List<Tarea> findByIdEncargado(int idEncargado);
     List<Tarea> findByAceptadaAndIdProyecto(int aceptada, int idProyecto);
     List<Tarea> findByAceptadaAndIdSprint(int aceptada, int idSprint);
     List<Tarea> findByAceptadaAndIdProyectoAndIdSprintIsNull(int aceptada, int idProyecto);

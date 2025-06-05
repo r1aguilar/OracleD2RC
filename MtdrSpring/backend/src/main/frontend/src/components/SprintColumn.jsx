@@ -1,7 +1,6 @@
 import React from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
-import CreateTaskDeveloperModal from "./CreateTaskDeveloperModal";
 
 const SprintColumn = ({
   sprint,
@@ -10,7 +9,9 @@ const SprintColumn = ({
   isLastSprint,
   onStatusChange,
   isDisabled,
-  isChangingStatus
+  isChangingStatus,
+  setIsCreatingTask,
+  isManager
 }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: sprint.id,
@@ -43,21 +44,31 @@ const SprintColumn = ({
           <span>End: {sprint.fechaFin?.substring(0, 10)}</span>
           <span>
             Status:{" "}
-            {isLastSprint && sprint.completado === false ? (
-              <select
-                className="bg-[#1a1a1a] border border-neutral-600 px-2 py-1 rounded text-white text-sm"
-                value={sprint.completado}
-                onChange={handleStatusChange}
-                disabled={isChangingStatus}
-              >
-                <option value="">In Progress</option>
-                <option value="1">Completed</option>
-              </select>
-            ) : sprint.completado === false ? "In Progress" : "Completed"}
+            {isManager ? (
+              isLastSprint && sprint.completado === false ? (
+                <select
+                  className="bg-[#1a1a1a] border border-neutral-600 px-2 py-1 rounded text-white text-sm"
+                  value={sprint.completado}
+                  onChange={handleStatusChange}
+                  disabled={isChangingStatus}
+                >
+                  <option value="">In Progress</option>
+                  <option value="1">Completed</option>
+                </select>
+              ) : sprint.completado === false ? (
+                "In Progress"
+              ) : (
+                "Completed"
+              )
+            ) : sprint.completado === false ? (
+              "In Progress"
+            ) : (
+              "Completed"
+            )}
           </span>
           {!sprint.completado && (
             <button
-              onClick={() => console.log("TODO: open task modal")}
+              onClick={() => setIsCreatingTask(sprint)}
               className="flex items-center gap-2 bg-[#2a2a2a] text-white px-4 py-2 rounded-full border border-neutral-600"
             >
               <Plus size={12} /> Create new task

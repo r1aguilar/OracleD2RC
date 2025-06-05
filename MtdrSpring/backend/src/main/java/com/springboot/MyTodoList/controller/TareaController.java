@@ -48,6 +48,11 @@ public class TareaController {
         return tareaService.findAllTasksFromProjectForUser(id);
     }
 
+    @GetMapping(value = "/TareasCompletasUsuario/{id}")
+    public List<Tarea> getAllTareasDeveloper(@PathVariable int id){
+        return tareaService.findEveryTasksFromProjectForUser(id);
+    }
+
     @GetMapping(value = "/TareasProyecto/{id}")
     public List<Tarea> getAllTareasAceptadasProyecto(@PathVariable int id){
         return tareaService.findAllTasksFromProject(id);

@@ -43,15 +43,13 @@ const CreateSprintModal = ({ sprints, onClose, onSave }) => {
   }, [newSprint.fechaInicio]);
 
   const formatToOffsetDateTime = (dateString) => {
-    const date = new Date(dateString);
-    const offset = -date.getTimezoneOffset();
-    const sign = offset >= 0 ? "+" : "-";
-    const pad = (n) => String(Math.floor(Math.abs(n))).padStart(2, "0");
-    const hours = pad(offset / 60);
-    const minutes = pad(offset % 60);
-    const localOffset = `${sign}${hours}:${minutes}`;
-    return `${dateString}T00:00:00${localOffset}`;
+    return `${dateString}T00:00:00-06:00`;
   };
+
+  const formatToOffsetDateTimeEnd = (dateString) => {
+    return `${dateString}T23:59:59-06:00`;
+  };
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -74,7 +72,7 @@ const CreateSprintModal = ({ sprints, onClose, onSave }) => {
       const payload = {
         ...newSprint,
         fechaInicio: formatToOffsetDateTime(newSprint.fechaInicio),
-        fechaFin: formatToOffsetDateTime(newSprint.fechaFin),
+        fechaFin: formatToOffsetDateTimeEnd(newSprint.fechaFin),
         completado: false,
         deleted: false,
         idProyecto: lastSprint?.idProyecto || null

@@ -14,6 +14,11 @@ const ManagerAcceptTaskModal = ({ task, sprints, integrantes, onClose, onSave, o
 
   useEffect(() => {
     // Initialize editedTask with default start date from sprint
+    console.log(task)
+    setEditedTask(prev => ({
+        ...prev,
+        aceptada: 1
+      }));
     if (task?.idSprint && sprints?.length > 0) {
       const foundSprint = sprints.find(s => Number(s.id) === Number(task.idSprint));
       if (foundSprint) {
@@ -66,16 +71,20 @@ const ManagerAcceptTaskModal = ({ task, sprints, integrantes, onClose, onSave, o
 
   const handleDateChange = (e) => {
     const { value } = e.target;
-    const date = new Date(value);
-    const timezoneOffset = -360; // -6 hours in minutes
-    date.setMinutes(date.getMinutes() - date.getTimezoneOffset() + timezoneOffset);
-    const isoStringWithOffset = date.toISOString().replace('Z', '-06:00');
 
     setEditedTask(prev => ({
       ...prev,
-      fechaVencimiento: isoStringWithOffset
+      fechaVencimiento: formatToOffsetDateTimeEnd(value)
     }));
   };
+
+    const formatToOffsetDateTime = (dateString) => {
+      return `${dateString}T00:00:00-06:00`;
+    };
+
+    const formatToOffsetDateTimeEnd = (dateString) => {
+      return `${dateString}T23:59:59-06:00`;
+    };
 
   const handlePriorityChange = (priority) => {
     setEditedTask(prev => ({
@@ -273,7 +282,7 @@ const ManagerAcceptTaskModal = ({ task, sprints, integrantes, onClose, onSave, o
                   type="number"
                   name="storyPoints"
                   value={editedTask.storyPoints || ''}
-                  onChange={handleHoursChange}
+                  onChange={handleChange}
                   min="0"
                   step="1"
                   className="w-full bg-[#1a1a1a] border border-gray-600 rounded px-3 py-2 text-white"
