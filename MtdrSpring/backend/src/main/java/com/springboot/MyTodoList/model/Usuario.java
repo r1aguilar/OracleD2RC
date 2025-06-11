@@ -24,7 +24,6 @@ import lombok.Data;
 @Builder
 @Entity
 @Table(name = "USUARIO")
-@JsonIgnoreProperties(value = {"password", "idTelegram"})
 public class Usuario implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,7 +37,7 @@ public class Usuario implements UserDetails {
     String correo;
     @Column(name = "TELEFONO", unique = true)
     String telefono;
-    @Column(name = "PASS")
+    @Column(name = "PASSWORD")
     String password;
     @Column(name = "FECHACREACION")
     OffsetDateTime  fechaCreacion;

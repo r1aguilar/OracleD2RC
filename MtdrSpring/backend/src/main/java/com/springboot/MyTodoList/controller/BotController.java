@@ -2735,12 +2735,6 @@ private static boolean isValidStrict(String txt) {
 
 		// First row
 		KeyboardRow row = new KeyboardRow();
-		row.add(BotLabels.MANAGE_PROJECTS.getLabel());
-		row.add(BotLabels.MANAGE_TEAMS.getLabel());
-		keyboard.add(row);
-
-		// Second row
-		row = new KeyboardRow();
 		row.add(BotLabels.MANAGE_TASKS.getLabel());
 		row.add(BotLabels.SHOW_NOT_ACCEPTED_TASKS.getLabel());
 		keyboard.add(row);
@@ -2781,7 +2775,6 @@ private static boolean isValidStrict(String txt) {
 		// First row
 		KeyboardRow row = new KeyboardRow();
 		row.add(BotLabels.VIEW_REPORTS.getLabel());
-		row.add(BotLabels.VIEW_REMINDERS.getLabel());
 		keyboard.add(row);
 
 		// Second row

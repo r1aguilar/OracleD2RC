@@ -89,6 +89,7 @@ public class UsuarioService {
             Usuario.setID(id);
             Usuario.setNombre(td.getNombre());
             Usuario.setTelefono(td.getTelefono());
+            Usuario.setCorreo(td.getCorreo());
             Usuario.setPassword(td.getPassword());
             Usuario.setDeleted(td.getDeleted());
             Usuario.setIdTelegram(td.getIdTelegram());

@@ -15,6 +15,6 @@ import com.springboot.MyTodoList.model.Proyecto;
 @Transactional
 @EnableTransactionManagement
 public interface ProyectoRepository extends JpaRepository<Proyecto,Integer> {
-   List<Proyecto> findByIdManager(int id_manager);
+   List<Proyecto> findByIdManagerOrderByIdProyecto(int id_manager);
 }
 

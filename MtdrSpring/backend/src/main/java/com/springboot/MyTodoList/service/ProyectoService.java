@@ -33,7 +33,7 @@ public class ProyectoService {
 
 
     public List<Proyecto> findAllProjectsForManager(int id_manager){
-        List<Proyecto> listaProyectos = proyectoRepository.findByIdManager(id_manager);
+        List<Proyecto> listaProyectos = proyectoRepository.findByIdManagerOrderByIdProyecto(id_manager);
         return listaProyectos;
     }
 

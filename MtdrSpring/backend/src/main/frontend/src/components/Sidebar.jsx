@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 const navItems = [
   { icon: <LayoutDashboard size={20} />, label: "Dashboard", path: "/dashdev" },
   { icon: <Folder size={20} />, label: "Backlog", path: "/backlogDev"},
-  { icon: <User size={20} />, label: "Profile", path: "/profile" }, // add your real route
+  { icon: <User size={20} />, label: "Profile", path: "/profileDev" }, // add your real route
   { icon: <LogOut size={20} />, label: "Logout", path: "/logout" },
 ];
 

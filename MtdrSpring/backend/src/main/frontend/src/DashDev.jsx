@@ -185,6 +185,7 @@ const DashDev = () => {
       if (!res.ok) throw new Error("Error al cargar tareas");
 
       const data = await res.json();
+      console.log(data);
       const newTasks = { pending: [], doing: [], done: [] };
 
       data.forEach((task) => {
@@ -229,6 +230,7 @@ const DashDev = () => {
     try {
       const res = await fetch(`/pruebasSprint/SprintsForUser/${userId}`);
       const data = await res.json();
+      console.log(data);
 
       const validSprints = data.filter(sprint => 
         sprint && sprint.id !== undefined && sprint.id !== null

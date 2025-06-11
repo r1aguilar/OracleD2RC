@@ -22,11 +22,16 @@ import com.springboot.MyTodoList.model.loginRequestCorreo;
 import com.springboot.MyTodoList.model.loginRequestTelefono;
 import com.springboot.MyTodoList.service.UsuarioService;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 @RestController
 @RequestMapping("/pruebasUser")
 public class UsuarioController {
     @Autowired
     private UsuarioService usuarioService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @GetMapping(value = "/usuarios")
     @PreAuthorize("hasAuthority('MANAGER')")
@@ -87,6 +92,18 @@ public class UsuarioController {
     @PutMapping(value = "updateUsuario/{id}")
     public ResponseEntity updateUsuario(@RequestBody Usuario usuario, @PathVariable int id){
         try{
+            Usuario dbUsuario = usuarioService.updateUsuario(id, usuario);
+            System.out.println(dbUsuario.toString());
+            return new ResponseEntity<>(dbUsuario,HttpStatus.OK);
+        }catch (Exception e){
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @PutMapping(value = "updateUsuarioProfile/{id}")
+    public ResponseEntity updateUsuarioProfile(@RequestBody Usuario usuario, @PathVariable int id){
+        try{
+            usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
             Usuario dbUsuario = usuarioService.updateUsuario(id, usuario);
             System.out.println(dbUsuario.toString());
             return new ResponseEntity<>(dbUsuario,HttpStatus.OK);

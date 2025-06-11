@@ -24,8 +24,8 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave, onDelete }) => {
           const startDate = new Date(foundSprint.fechaInicio);
           const endDate = new Date(foundSprint.fechaFin);
           
-          setMinDate(startDate.toISOString().split('T')[0]);
-          setMaxDate(endDate.toISOString().split('T')[0]);
+          setMinDate(foundSprint.fechaInicio.split('T')[0]);
+          setMaxDate(foundSprint.fechaFin.split('T')[0]);
           
           // Validar fecha actual
           const currentDueDate = new Date(task.fechaVencimiento);
@@ -33,7 +33,7 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave, onDelete }) => {
             const correctedDate = currentDueDate < startDate ? startDate : endDate;
             setEditedTask(prev => ({
               ...prev,
-              fechaVencimiento: correctedDate.toISOString()
+              fechaVencimiento: `${correctedDate}T23:59:59-06:00`
             }));
           }
         }
@@ -188,7 +188,7 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave, onDelete }) => {
                 <label className="block text-sm font-medium text-gray-300 mb-1">Start Date</label>
                 <input
                   type="date"
-                  value={task.fechaInicio ? new Date(task.fechaInicio).toISOString().split('T')[0] : ''}
+                  value={task.fechaInicio ? task.fechaInicio.split('T')[0] : ''}
                   readOnly
                   className="w-full bg-[#333] border border-gray-600 rounded px-3 py-2 text-gray-400 cursor-not-allowed"
                 />
@@ -198,20 +198,10 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave, onDelete }) => {
                 <label className="block text-sm font-medium text-gray-300 mb-1">End Date</label>
                 <input
                   type="date"
-                  name="fechaVencimiento"
-                  value={editedTask.fechaVencimiento ? new Date(editedTask.fechaVencimiento).toISOString().split('T')[0] : ''}
-                  onChange={handleDateChange}
-                  min={minDate}
-                  max={maxDate}
-                  className="w-full bg-[#1a1a1a] border border-gray-600 rounded px-3 py-2 text-white"
-                  required
-                  disabled={isDone}
+                  value={task.fechaVencimiento ? task.fechaVencimiento.split('T')[0] : ''}
+                  readOnly
+                  className="w-full bg-[#333] border border-gray-600 rounded px-3 py-2 text-gray-400 cursor-not-allowed"
                 />
-                {sprintInfo && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Sprint: {sprintInfo.nombre} ({minDate} a {maxDate})
-                  </p>
-                )}
               </div>
             </div>
             
@@ -229,7 +219,7 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave, onDelete }) => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Horas Reales {!isDone && '(Solo para tareas completadas)'}
+                  Real Hours {!isDone && '(Just for completed tasks)'}
                 </label>
                 <input
                   type="number"
@@ -257,7 +247,7 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave, onDelete }) => {
                   className={`px-3 py-1 rounded-full text-xs ${editedTask.prioridad === 1 ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}
                   disabled={isDone}
                 >
-                  Baja
+                  Low
                 </button>
                 <button
                   type="button"
@@ -265,7 +255,7 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave, onDelete }) => {
                   className={`px-3 py-1 rounded-full text-xs ${editedTask.prioridad === 2 ? 'bg-yellow-500 text-white' : 'bg-gray-700 text-gray-300'}`}
                   disabled={isDone}
                 >
-                  Media
+                  Medium
                 </button>
                 <button
                   type="button"
@@ -273,7 +263,7 @@ const TaskDetailsModal = ({ task, sprints, onClose, onSave, onDelete }) => {
                   className={`px-3 py-1 rounded-full text-xs ${editedTask.prioridad === 3 ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300'}`}
                   disabled={isDone}
                 >
-                  Alta
+                  High
                 </button>
               </div>
             </div>

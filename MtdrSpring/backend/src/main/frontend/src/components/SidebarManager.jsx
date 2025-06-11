@@ -17,7 +17,7 @@ const navItems = [
   { icon: <Folder size={20} />, label: "Backlog", path: "/backlogMan" },
   { icon: <FileChartPie size={20} />, label: "Analytics", path: "/analytics" },
   { icon: <FileChartColumnIncreasing size={20} />, label: "Analytics By Sprint", path: "/analyticssprint" }, 
-  { icon: <User size={20} />, label: "Profile", path: "/profile" }, // add your real route
+  { icon: <User size={20} />, label: "Profile", path: "/profileManager" }, // add your real route
   { icon: <LogOut size={20} />, label: "Logout", path: "/logout" }, // or handle logout differently
 
 ];

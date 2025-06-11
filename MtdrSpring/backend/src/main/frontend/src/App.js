@@ -9,6 +9,8 @@ import AnalyticsSprint from "./Analyticsbysprint";
 import DashManager from "./DashManager";
 import BacklogDeveloper from "./BacklogDeveloper";
 import Register from "./Register";
+import ProfileManager from "./ProfileManager";
+import ProfileDev from "./ProfileDev";
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
       <Route path="/backlogDev" element={<BacklogDeveloper />} />
       <Route path="/analytics" element={<AnalyticsManager />} />
       <Route path="/analyticssprint" element={<AnalyticsSprint />} />
+      <Route path="/profileManager" element={<ProfileManager/>} />
+      <Route path="/profileDev" element={<ProfileDev />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

@@ -39,23 +39,27 @@ const CreateTaskDeveloperModal = ({sprint, idProy, sprints, onClose, onSave }) =
     setSprintInfo(foundSprint);
 
     if (foundSprint.fechaInicio && foundSprint.fechaFin) {
-      const startDate = new Date(foundSprint.fechaInicio);
-      const endDate = new Date(foundSprint.fechaFin);
-      setMinDate(startDate.toISOString().split('T')[0]);
-      setMaxDate(endDate.toISOString().split('T')[0]);
+      const startDateString = foundSprint.fechaInicio.split('T')[0];
+      const endDateString = foundSprint.fechaFin.split('T')[0];
+
+      setMinDate(startDateString);
+      setMaxDate(endDateString);
 
       setEditedTask(prev => {
-        const dueDate = new Date(prev.fechaVencimiento || endDate.toISOString());
+        const dueDate = new Date(prev.fechaVencimiento || foundSprint.fechaFin);
+        const correctedDate = new Date(dueDate);
 
-        const correctedDate =
-          dueDate < startDate ? startDate :
-          dueDate > endDate ? endDate :
-          dueDate;
+        if (correctedDate < new Date(foundSprint.fechaInicio)) {
+          correctedDate.setTime(new Date(foundSprint.fechaInicio).getTime());
+        }
+        if (correctedDate > new Date(foundSprint.fechaFin)) {
+          correctedDate.setTime(new Date(foundSprint.fechaFin).getTime());
+        }
 
-        return {
+        return {    
           ...prev,
-          fechaInicio: startDate.toISOString(),
-          fechaVencimiento: correctedDate.toISOString()
+          fechaInicio: foundSprint.fechaInicio,
+          fechaVencimiento: foundSprint.fechaFin // optional: or keep as is
         };
       });
     }
@@ -179,7 +183,7 @@ const CreateTaskDeveloperModal = ({sprint, idProy, sprints, onClose, onSave }) =
                 <label className="block text-sm font-medium text-gray-300 mb-1">Start Date</label>
                 <input
                   type="date"
-                  value={editedTask.fechaInicio ? new Date(editedTask.fechaInicio).toISOString().split('T')[0] : ''}
+                  value={editedTask.fechaInicio ? editedTask.fechaInicio.split('T')[0] : ''}
                   readOnly
                   disabled={!editedTask.idSprint}
                   className={`w-full border rounded px-3 py-2 cursor-not-allowed bg-[#333] text-gray-400 border-gray-600`}
@@ -191,9 +195,9 @@ const CreateTaskDeveloperModal = ({sprint, idProy, sprints, onClose, onSave }) =
                 <input
                   type="date"
                   name="fechaVencimiento"
-                  value={editedTask.fechaVencimiento ? new Date(editedTask.fechaVencimiento).toISOString().split('T')[0] : ''}
+                  value={editedTask.fechaVencimiento ? editedTask.fechaVencimiento.split('T')[0] : ''}
                   onChange={editedTask.idSprint ? handleDateChange : undefined}
-                  min={editedTask.fechaInicio ? new Date(editedTask.fechaInicio).toISOString().split('T')[0] : minDate}
+                  min={editedTask.fechaInicio ? editedTask.fechaInicio.split('T')[0] : minDate}
                   max={maxDate}
                   disabled={!editedTask.idSprint}
                   className={`w-full border rounded px-3 py-2 ${

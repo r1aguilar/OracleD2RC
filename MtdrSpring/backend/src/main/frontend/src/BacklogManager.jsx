@@ -66,11 +66,7 @@ const BacklogManager = () => {
       prevTasks.map((t) => (t.id === draggedTask.id ? updatedTask : t))
     );
 
-    try {
-      const response = await fetch(`/pruebas/updateTarea/${draggedTask.rawId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    var bodyToSend = JSON.stringify({
           idTarea: draggedTask.rawId,
           idEncargado: draggedTask.idEncargado,
           idProyecto: draggedTask.idProyecto,
@@ -81,12 +77,20 @@ const BacklogManager = () => {
           prioridad: draggedTask.prioridad,
           fechaInicio: targetSprint?.fechaInicio || null,
           fechaVencimiento: targetSprint?.fechaFin || null,
-          fechaCompletado: draggedTask.fechaCompletado,
+          fechaCompletado: draggedTask.fechaCompletado || null,
           storyPoints: draggedTask.storyPoints,
           tiempoReal: draggedTask.tiempoReal,
           tiempoEstimado: draggedTask.tiempoEstimado,
           aceptada: draggedTask.aceptada,
-        }),
+        });
+
+    console.log(bodyToSend);
+
+    try {
+      const response = await fetch(`/pruebas/updateTarea/${draggedTask.rawId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: bodyToSend,
       });
 
       if (!response.ok) {
@@ -347,6 +351,7 @@ const BacklogManager = () => {
       prioridad: newTask.prioridad,
       fechaInicio: newTask.fechaInicio,
       fechaVencimiento: newTask.fechaVencimiento,
+      fechaCompletado: newTask.fechaCompletado,
       storyPoints: newTask.storyPoints,
       tiempoReal: newTask.tiempoReal,
       tiempoEstimado: newTask.tiempoEstimado,
@@ -485,6 +490,9 @@ const BacklogManager = () => {
                 completado: false,
                 deleted: false
               }}
+              activeTaskId={activeTaskId}
+              setIsCreatingTask={handleOpenCreateTaskModel}
+              isManager={true}
             >
               {tasks
                 .filter((task) => task.idSprint === null)

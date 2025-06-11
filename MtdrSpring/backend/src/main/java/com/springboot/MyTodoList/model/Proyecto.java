@@ -13,7 +13,7 @@ public class Proyecto {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID_PROYECTO")
-    int id_proyecto;
+    int idProyecto;
     @Column(name = "ID_MANAGER")
     int idManager;
     @Column(name = "NOMBRE")
@@ -26,7 +26,7 @@ public class Proyecto {
     public Proyecto(){}
 
     public Proyecto(int ID, int id_man, String name, String descripcion, boolean deleted){
-        this.id_proyecto = ID;
+        this.idProyecto = ID;
         this.nombre = name;
         this.idManager = id_man;
         this.descripcion = descripcion;
@@ -34,11 +34,11 @@ public class Proyecto {
     }
 
     public int getID(){
-        return id_proyecto;
+        return idProyecto;
     }
 
     public void setID(int Id){
-        this.id_proyecto = Id;
+        this.idProyecto = Id;
     }
 
     public int getIdManager(){

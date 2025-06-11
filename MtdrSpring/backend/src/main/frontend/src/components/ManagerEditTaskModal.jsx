@@ -17,13 +17,18 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
     if (task?.idSprint && sprints?.length > 0) {
       const foundSprint = sprints.find(s => Number(s.id) === Number(task.idSprint));
       if (foundSprint) {
+        console.log("Task", task)
         setSprintInfo(foundSprint);
         // Set start and end dates for the date picker
         if (foundSprint.fechaInicio && foundSprint.fechaFin) {
-          const startDate = new Date(foundSprint.fechaInicio);
-          const endDate = new Date(foundSprint.fechaFin);
-          setMinDate(startDate.toISOString().split('T')[0]);
-          setMaxDate(endDate.toISOString().split('T')[0]);
+          const startDateString = foundSprint.fechaInicio.split('T')[0];
+          const endDateString = foundSprint.fechaFin.split('T')[0];
+
+          setMinDate(startDateString);
+          setMaxDate(endDateString);
+
+          const startDate = new Date(startDateString)
+          const endDate = new Date(endDateString)
 
           // Ensure due date is within sprint range
           const currentDueDate = new Date(task.fechaVencimiento);
@@ -31,13 +36,13 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
             const correctedDate = currentDueDate < startDate ? startDate : endDate;
             setEditedTask(prev => ({
               ...prev,
-              fechaVencimiento: correctedDate.toISOString(),
-              fechaInicio: startDate.toISOString() // Set default start date
+              fechaVencimiento: task.fechaVencimiento,
+              fechaInicio: foundSprint.fechaInicio // Set default start date
             }));
           } else {
             setEditedTask(prev => ({
               ...prev,
-              fechaInicio: startDate.toISOString() // Set default start date
+              fechaInicio: foundSprint.fechaInicio // Set default start date
             }));
           }
         }
@@ -47,6 +52,7 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    console.log("Edited Task", editedTask)
     setEditedTask(prev => ({
       ...prev,
       [name]: value
@@ -158,7 +164,7 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-[#2a2a2a] rounded-lg p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-white">Detalles de la Tarea</h2>
+          <h2 className="text-xl font-semibold text-white">Edit Task Details</h2>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-white"
@@ -176,7 +182,7 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Nombre</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
               <input
                 type="text"
                 name="title"
@@ -188,7 +194,7 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Descripción</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
               <textarea
                 name="description"
                 value={editedTask.description}
@@ -200,39 +206,29 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Fecha de Inicio</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Start Date</label>
                 <input
                   type="date"
-                  value={editedTask.fechaInicio ? new Date(editedTask.fechaInicio).toISOString().split('T')[0] : ''}
+                  value={editedTask.fechaInicio ? editedTask.fechaInicio.split('T')[0] : ''}
                   readOnly
                   className="w-full bg-[#333] border border-gray-600 rounded px-3 py-2 text-gray-400 cursor-not-allowed"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Fecha de Vencimiento</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">End Date</label>
                 <input
                   type="date"
-                  name="fechaVencimiento"
-                  value={editedTask.fechaVencimiento ? new Date(editedTask.fechaVencimiento).toISOString().split('T')[0] : ''}
-                  onChange={handleDateChange}
-                  min={minDate}
-                  max={maxDate}
-                  className="w-full bg-[#1a1a1a] border border-gray-600 rounded px-3 py-2 text-white"
-                  required
-                  disabled={isDone}
+                  value={editedTask.fechaVencimiento ? editedTask.fechaVencimiento.split('T')[0] : ''}
+                  readOnly
+                  className="w-full bg-[#333] border border-gray-600 rounded px-3 py-2 text-gray-400 cursor-not-allowed"
                 />
-                {sprintInfo && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Sprint: {sprintInfo.nombre} ({minDate} a {maxDate})
-                  </p>
-                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Tiempo Estimado (horas)</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Estimated Time (hours)</label>
                 <input
                   type="number"
                   name="tiempoEstimado"
@@ -247,7 +243,7 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Horas Reales</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Real Hours</label>
                 <input
                   type="number"
                   value={editedTask.tiempoReal || '0'}
@@ -258,28 +254,28 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Prioridad</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Priority</label>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => handlePriorityChange(1)}
                   className={`px-3 py-1 rounded-full text-xs ${editedTask.prioridad === 1 ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}
                 >
-                  Baja
+                  Low
                 </button>
                 <button
                   type="button"
                   onClick={() => handlePriorityChange(2)}
                   className={`px-3 py-1 rounded-full text-xs ${editedTask.prioridad === 2 ? 'bg-yellow-500 text-white' : 'bg-gray-700 text-gray-300'}`}
                 >
-                  Media
+                  Medium
                 </button>
                 <button
                   type="button"
                   onClick={() => handlePriorityChange(3)}
                   className={`px-3 py-1 rounded-full text-xs ${editedTask.prioridad === 3 ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300'}`}
                 >
-                  Alta
+                  High
                 </button>
               </div>
             </div>
@@ -302,7 +298,7 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Desarrollador</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Developer</label>
               <select
                 name="idEncargado"
                 value={editedTask.idEncargado || ''}
@@ -311,7 +307,7 @@ const ManagerEditTaskModal = ({ task, sprints, integrantes, onClose, onSave, onD
                 required
                 disabled={isDone}
               >
-                <option value="">Seleccionar Desarrollador</option>
+                <option value="">Select Developer</option>
                 {integrantes.map(user => (
                   <option key={user.id} value={user.id}>
                     {user.nombre}
