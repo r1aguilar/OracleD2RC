@@ -3,13 +3,18 @@ import SidebarManager from "./components/SidebarManager";
 import { Plus } from "lucide-react";
 import { Bell, UserCircle, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, DragOverlay} from "@dnd-kit/core";
+import {
+  DndContext,
+  closestCenter,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  DragOverlay,
+} from "@dnd-kit/core";
 import SprintColumn from "./components/SprintColumn";
 import CreateSprintModal from "./components/CreateSprintModal";
 import TaskChip from "./components/TaskChip";
 import CreateTaskManagerModal from "./components/CreateTaskManagerModal";
-
-
 
 const BacklogManager = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -28,6 +33,7 @@ const BacklogManager = () => {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [createTaskSprintId, setCreateTaskSprintId] = useState(null);
   const [isSavingTask, setIsSavingTask] = useState(false);
+  const [verification, setVerification] = useState(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
   const [activeTaskId, setActiveTaskId] = useState(null);
@@ -51,7 +57,7 @@ const BacklogManager = () => {
     const targetSprint = sprints.find((s) => s.id === targetSprintId);
     const sourceSprint = sprints.find((s) => s.id === draggedTask.idSprint);
 
-      // Block if either sprint is completed
+    // Block if either sprint is completed
     if (targetSprint?.completado || sourceSprint?.completado) return;
 
     const updatedTask = {
@@ -67,31 +73,34 @@ const BacklogManager = () => {
     );
 
     var bodyToSend = JSON.stringify({
-          idTarea: draggedTask.rawId,
-          idEncargado: draggedTask.idEncargado,
-          idProyecto: draggedTask.idProyecto,
-          idColumna: draggedTask.idColumna,
-          idSprint: targetSprintId,
-          nombre: draggedTask.title,
-          descripcion: draggedTask.description,
-          prioridad: draggedTask.prioridad,
-          fechaInicio: targetSprint?.fechaInicio || null,
-          fechaVencimiento: targetSprint?.fechaFin || null,
-          fechaCompletado: draggedTask.fechaCompletado || null,
-          storyPoints: draggedTask.storyPoints,
-          tiempoReal: draggedTask.tiempoReal,
-          tiempoEstimado: draggedTask.tiempoEstimado,
-          aceptada: draggedTask.aceptada,
-        });
+      idTarea: draggedTask.rawId,
+      idEncargado: draggedTask.idEncargado,
+      idProyecto: draggedTask.idProyecto,
+      idColumna: draggedTask.idColumna,
+      idSprint: targetSprintId,
+      nombre: draggedTask.title,
+      descripcion: draggedTask.description,
+      prioridad: draggedTask.prioridad,
+      fechaInicio: targetSprint?.fechaInicio || null,
+      fechaVencimiento: targetSprint?.fechaFin || null,
+      fechaCompletado: draggedTask.fechaCompletado || null,
+      storyPoints: draggedTask.storyPoints,
+      tiempoReal: draggedTask.tiempoReal,
+      tiempoEstimado: draggedTask.tiempoEstimado,
+      aceptada: draggedTask.aceptada,
+    });
 
     console.log(bodyToSend);
 
     try {
-      const response = await fetch(`/pruebas/updateTarea/${draggedTask.rawId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: bodyToSend,
-      });
+      const response = await fetch(
+        `/pruebas/updateTarea/${draggedTask.rawId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: bodyToSend,
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
@@ -115,69 +124,69 @@ const BacklogManager = () => {
     }
   };
 
-
-
   const fetchProyectos = useCallback(async () => {
     const userId = JSON.parse(localStorage.getItem("userId"));
     if (!userId) return;
     try {
       const res = await fetch(`/pruebasProy/ProyectosForManager/${userId}`);
       const data = await res.json();
-      
+
       // Ensure we get valid sprint data
-      const validProys = data.filter(proy => 
-        proy && proy.id !== undefined && proy.id !== null
+      const validProys = data.filter(
+        (proy) => proy && proy.id !== undefined && proy.id !== null
       );
-      
+
       // Log valid sprints for debugging
       console.log("Fetched proyectos:", validProys);
-      
+
       setProyectos(validProys);
-      console.log(validProys[0].id)
-      setSelectedProyecto(validProys[0].id)
-      
+      console.log(validProys[0].id);
+      setSelectedProyecto(validProys[0].id);
+
       console.log("Initial selected proyecto IDs:", validProys[0].id);
 
       return validProys[0].id;
-      
     } catch (err) {
       console.error("Failed to fetch proyectos", err);
     }
   }, []);
 
-  const fetchIntegrantes = useCallback(async (proyectoId = selectedProyecto) => {
+  const fetchIntegrantes = useCallback(
+    async (proyectoId = selectedProyecto) => {
       if (!proyectoId) return;
       try {
         const res = await fetch(`/pruebasProy/UsuariosProyecto/${proyectoId}`);
         const data = await res.json();
-        
+
         // Ensure we get valid sprint data
-        const validUsers = data.filter(user => 
-          user && user.id !== undefined && user.id !== null
+        const validUsers = data.filter(
+          (user) => user && user.id !== undefined && user.id !== null
         );
-        
+
         // Log valid sprints for debugging
         console.log("Fetched users:", validUsers);
-  
+
         setIntegrantes(validUsers);
-        setSelectedIntegrante(null)
-        
+        setSelectedIntegrante(null);
       } catch (err) {
         console.error("Failed to fetch users", err);
       }
-    }, []);
+    },
+    []
+  );
 
-    const fetchTasks = useCallback(async (proyectoId = selectedProyecto) => {
+  const fetchTasks = useCallback(
+    async (proyectoId = selectedProyecto) => {
       console.log("Tasks proyecto id", proyectoId);
       if (!proyectoId) return;
-  
+
       try {
         const res = await fetch(`/pruebas/TareasProyecto/${proyectoId}`);
         if (!res.ok) throw new Error("Error al cargar tareas");
-  
+
         const data = await res.json();
         const newTasks = [];
-  
+
         data.forEach((task) => {
           const taskObj = {
             id: `task-${task.idTarea}`,
@@ -196,20 +205,27 @@ const BacklogManager = () => {
             tiempoEstimado: task.tiempoEstimado,
             prioridad: task.prioridad,
             aceptada: 1,
-            type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
+            type:
+              task.prioridad === 1
+                ? "Low"
+                : task.prioridad === 2
+                ? "Medium"
+                : "High",
           };
           newTasks.push(taskObj);
         });
-  
+
         setTasks(newTasks);
-        setAllTasks(newTasks);  // Save full list
+        setAllTasks(newTasks); // Save full list
       } catch (err) {
         console.error(err);
         navigate("/login");
       } finally {
         setIsLoading(false);
       }
-    }, [navigate]);
+    },
+    [navigate]
+  );
 
   const fetchSprints = useCallback(async (proyectoId = selectedProyecto) => {
     if (!proyectoId) return;
@@ -217,36 +233,64 @@ const BacklogManager = () => {
     try {
       const res = await fetch(`/pruebasSprint/SprintsForProject/${proyectoId}`);
       const data = await res.json();
-      
+
       // Ensure we get valid sprint data
-      const validSprints = data.filter(sprint => 
-        sprint && sprint.id !== undefined && sprint.id !== null
+      const validSprints = data.filter(
+        (sprint) => sprint && sprint.id !== undefined && sprint.id !== null
       );
-      
+
       // Log valid sprints for debugging
       console.log("Fetched sprints:", validSprints);
-      
+
       setSprints(validSprints);
-      
     } catch (err) {
       console.error("Failed to fetch sprints", err);
     }
   }, []);
+
+  const checkTokenAndFetchData = async () => {
+    try {
+      const response = await fetch("/pruebasUser/validarTokenManager", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // or however you store it
+        },
+      });
+
+      if (!response.ok) throw new Error("Token validation request failed");
+
+      const isValid = await response.json();
+      if (!isValid) {
+        navigate("/login");
+        return;
+      }
+      console.log("Verification completed");
+      setVerification(true);
+    } catch (error) {
+      navigate("/login");
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      await checkTokenAndFetchData();
+    };
+    init();
+  }, [checkTokenAndFetchData]);
 
   useEffect(() => {
     const init = async () => {
       const proyectoId = await fetchProyectos();
     };
     init();
-  }, []);
+  }, [verification]);
 
   useEffect(() => {
-      if (selectedProyecto) {
-        fetchTasks(selectedProyecto);
-        fetchSprints(selectedProyecto);
-        fetchIntegrantes(selectedProyecto);
-      }
-    }, [selectedProyecto]);
+    if (selectedProyecto) {
+      fetchTasks(selectedProyecto);
+      fetchSprints(selectedProyecto);
+      fetchIntegrantes(selectedProyecto);
+    }
+  }, [selectedProyecto]);
 
   useEffect(() => {
     if (!selectedIntegrante || selectedIntegrante === "null") {
@@ -264,7 +308,7 @@ const BacklogManager = () => {
 
   // Inside BacklogManager component
   const handleSprintStatusChange = async (sprintId, newStatus) => {
-    const sprint = sprints.find(s => s.id === sprintId);
+    const sprint = sprints.find((s) => s.id === sprintId);
     if (!newStatus || isChangingSprintStatus) return;
 
     setIsChangingSprintStatus(true);
@@ -281,11 +325,14 @@ const BacklogManager = () => {
     };
 
     try {
-      const response = await fetch(`/pruebasSprint/CompleteSprint/${sprintId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sprintPayload),
-      });
+      const response = await fetch(
+        `/pruebasSprint/CompleteSprint/${sprintId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sprintPayload),
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to complete sprint");
 
@@ -335,10 +382,10 @@ const BacklogManager = () => {
   };
 
   const handleOpenCreateTaskModel = (sprintId) => {
-    console.log("Changing createTaskSprintId")
+    console.log("Changing createTaskSprintId");
     setCreateTaskSprintId(sprintId.id);
     setIsCreatingTask(true);
-  }
+  };
 
   const handleAddTask = async (newTask) => {
     const taskPayload = {
@@ -387,20 +434,27 @@ const BacklogManager = () => {
         tiempoEstimado: newTask.tiempoEstimado,
         prioridad: newTask.prioridad,
         aceptada: 1,
-        type: newTask.prioridad === 1 ? "Low" : newTask.prioridad === 2 ? "Medium" : "High",
+        type:
+          newTask.prioridad === 1
+            ? "Low"
+            : newTask.prioridad === 2
+            ? "Medium"
+            : "High",
       };
 
-      setTasks(prev => [...prev, formattedTask]);
-      setAllTasks(prev => [...prev, formattedTask]);
+      setTasks((prev) => [...prev, formattedTask]);
+      setAllTasks((prev) => [...prev, formattedTask]);
     } catch (e) {
       console.error("Error adding task:", e);
     }
   };
 
-
   return (
     <div className="flex h-screen bg-[#1a1a1a]">
-      <SidebarManager isMobileOpen={isMobileOpen} closeMobile={() => setIsMobileOpen(false)} />
+      <SidebarManager
+        isMobileOpen={isMobileOpen}
+        closeMobile={() => setIsMobileOpen(false)}
+      />
 
       <div className="flex-1 px-4 md:px-6 lg:px-8 overflow-y-auto">
         <header className="flex flex-wrap items-center justify-between py-4 gap-4">
@@ -430,10 +484,6 @@ const BacklogManager = () => {
                 </option>
               ))}
             </select>
-            <div className="flex items-center gap-3">
-              <Bell className="text-white cursor-pointer hover:text-red-500" />
-              <UserCircle className="text-white w-8 h-8 cursor-pointer hover:text-red-500" />
-            </div>
           </div>
         </header>
 
@@ -445,8 +495,11 @@ const BacklogManager = () => {
         >
           <div className="space-y-6">
             {sprints.map((sprint, index) => {
-              const isLastSprint = sprint.completado === false && completadoFlag;
-              if(isLastSprint){completadoFlag = false;}
+              const isLastSprint =
+                sprint.completado === false && completadoFlag;
+              if (isLastSprint) {
+                completadoFlag = false;
+              }
 
               return (
                 <SprintColumn
@@ -473,7 +526,6 @@ const BacklogManager = () => {
               );
             })}
 
-
             <button
               onClick={() => setIsCreateSprintModalOpen(true)}
               className="flex items-center gap-2 bg-[#2a2a2a] text-white px-4 py-2 rounded-full border border-neutral-600"
@@ -488,7 +540,7 @@ const BacklogManager = () => {
                 fechaInicio: "-",
                 fechaFin: "-",
                 completado: false,
-                deleted: false
+                deleted: false,
               }}
               activeTaskId={activeTaskId}
               setIsCreatingTask={handleOpenCreateTaskModel}
@@ -534,12 +586,10 @@ const BacklogManager = () => {
               }}
             />
           )}
-
         </DndContext>
       </div>
     </div>
   );
-
 };
 
 export default BacklogManager;

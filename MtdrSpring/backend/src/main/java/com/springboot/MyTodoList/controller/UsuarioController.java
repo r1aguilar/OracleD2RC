@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,6 +22,8 @@ import com.springboot.MyTodoList.model.Usuario;
 import com.springboot.MyTodoList.model.loginRequestCorreo;
 import com.springboot.MyTodoList.model.loginRequestTelefono;
 import com.springboot.MyTodoList.service.UsuarioService;
+
+import com.springboot.MyTodoList.security.JwtService;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -33,11 +36,38 @@ public class UsuarioController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtService jwtService;
+
+    private String extractToken(String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        throw new IllegalArgumentException("Invalid Authorization header format");
+    }
+
     @GetMapping(value = "/usuarios")
     @PreAuthorize("hasAuthority('MANAGER')")
     public List<Usuario> getAllUsuarios(){
         return usuarioService.findAll();
     }
+
+    @GetMapping(value = "/validarTokenManager")
+    @PreAuthorize("hasAuthority('MANAGER')")
+    public ResponseEntity<Boolean> validarTokenManager(@RequestHeader("Authorization") String authHeader) {
+        String token = extractToken(authHeader);
+        boolean isValid = !jwtService.expiresInLessThan30Minutes(token);
+        return ResponseEntity.ok(isValid);
+    }
+
+    @GetMapping(value = "/validarTokenDeveloper")
+    @PreAuthorize("hasAuthority('DEVELOPER')")
+    public ResponseEntity<Boolean> validarTokenDeveloper(@RequestHeader("Authorization") String authHeader) {
+        String token = extractToken(authHeader);
+        boolean isValid = !jwtService.expiresInLessThan30Minutes(token);
+        return ResponseEntity.ok(isValid);
+    }
+
 
     @GetMapping(value = "/usuarios/{id}")
     public ResponseEntity<Usuario> getUsuarioById(@PathVariable int id){

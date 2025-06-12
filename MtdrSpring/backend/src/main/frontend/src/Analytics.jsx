@@ -18,9 +18,10 @@ import {
   CalendarClock,
   ListChecks,
 } from "lucide-react";
-import NotificationPanel from "./components/NotificationPanel";
+import { useNavigate } from "react-router-dom";
 
 const AnalyticsManager = () => {
+  const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [selectedSprint, setSelectedSprint] = useState("Sprint1");
   const [allTasks, setAllTasks] = useState([]);
@@ -33,6 +34,7 @@ const AnalyticsManager = () => {
   const [userTasks, setUserTasks] = useState([]);
   const [totalHoursBySprint, setTotalHoursBySprint] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [verification, setVerification] = useState(null);
 
   const sprintNameMap = sprints.reduce((acc, s) => {
     acc[`Sprint${s.id}`] = s.name;
@@ -197,12 +199,41 @@ const AnalyticsManager = () => {
     }
   };
 
+  const checkTokenAndFetchData = async () => {
+    try {
+      const response = await fetch("/pruebasUser/validarTokenManager", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // or however you store it
+        },
+      });
+
+      if (!response.ok) throw new Error("Token validation request failed");
+
+      const isValid = await response.json();
+      if (!isValid) {
+        navigate("/login");
+        return;
+      }
+      console.log("Verification completed");
+      setVerification(true);
+    } catch (error) {
+      navigate("/login");
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      await checkTokenAndFetchData();
+    };
+    init();
+  }, [checkTokenAndFetchData]);
+
   useEffect(() => {
     const init = async () => {
       await fetchProyectos();
     };
     init();
-  }, []);
+  }, [verification]);
 
   // 2. When selectedProyecto changes
   useEffect(() => {
@@ -368,10 +399,6 @@ const AnalyticsManager = () => {
                 </option>
               ))}
             </select>
-            <div className="flex items-center gap-3">
-              <NotificationPanel />
-              <UserCircle className="text-white w-8 h-8 me-6 cursor-pointer hover:text-red-500" />
-            </div>
           </div>
         </header>
 

@@ -28,6 +28,7 @@ import com.springboot.MyTodoList.model.Proyecto;
 import com.springboot.MyTodoList.model.Sprints;
 import com.springboot.MyTodoList.model.Tarea;
 import com.springboot.MyTodoList.model.Usuario;
+import com.springboot.MyTodoList.service.ChatStateService;
 import com.springboot.MyTodoList.service.EquipoService;
 import com.springboot.MyTodoList.service.IntegrantesEquipoService;
 import com.springboot.MyTodoList.service.ProyectoService;
@@ -59,6 +60,7 @@ public class BotController extends TelegramLongPollingBot {
 	private SprintsService sprintsService;
 	private IntegrantesEquipoService integrantesEquipoService;
 	private EquipoService equipoService;
+	private ChatStateService chatStateService;
 	private String botName;
 	public long userTelegramId; 
 
@@ -197,7 +199,7 @@ private static boolean isValidStrict(String txt) {
 	// Mapa para guardar el menú anterior
 	private Map<Long, String> chatPreviousMenuMap = new HashMap<>();
 
-	public BotController(String botToken, String botName, TareaService tareaService, UsuarioService usuarioService, ProyectoService proyectoService, SprintsService sprintsService, IntegrantesEquipoService integrantesEquipoService, EquipoService equipoService) {
+	public BotController(String botToken, String botName, TareaService tareaService, UsuarioService usuarioService, ProyectoService proyectoService, SprintsService sprintsService, IntegrantesEquipoService integrantesEquipoService, EquipoService equipoService, ChatStateService chatStateService) {
 		super(botToken);
 		logger.info("Bot Token: " + botToken);
 		logger.info("Bot name: " + botName);
@@ -207,6 +209,7 @@ private static boolean isValidStrict(String txt) {
 		this.sprintsService = sprintsService;
 		this.integrantesEquipoService = integrantesEquipoService;
 		this.equipoService = equipoService;
+		this.chatStateService = chatStateService;
 		this.botName = botName;
 	}
 
@@ -258,11 +261,13 @@ private static boolean isValidStrict(String txt) {
 		long chatId = update.getMessage().getChatId();
 	
 		// Verificar si estamos esperando un valor para un campo específico
-		String chatState = chatStateMap.get(chatId);
+		//String chatState = chatStateMap.get(chatId);
+		String chatState = chatStateService.getChatState(chatId);
 		if (chatState != null) {
 			if (chatState.startsWith("WAITING_FOR_UPDATE_TASK_")) {
 				String field = chatState.replace("WAITING_FOR_UPDATE_TASK_", "");
-				int tareaId = chatTareaIdMap.get(chatId);
+				//int tareaId = chatTareaIdMap.get(chatId);
+				int tareaId = chatStateService.getTareaId(chatId);
 	
 				// Obtener la tarea actual
 				Tarea tareacopy = tareaService.getItemById(tareaId).getBody();
@@ -327,7 +332,8 @@ private static boolean isValidStrict(String txt) {
 				}
 			} else if (chatState.startsWith("WAITING_FOR_PROJECT_FIELD_")) {
 				String field = chatState.replace("WAITING_FOR_PROJECT_FIELD_", "");
-				int proyectoId = chatTareaIdMap.get(chatId);
+				//int proyectoId = chatTareaIdMap.get(chatId);
+				int proyectoId = chatStateService.getTareaId(chatId);
 	
 				// Obtener el proyecto actual
 				Proyecto proyecto = proyectoService.getItemById(proyectoId).getBody();
@@ -358,7 +364,8 @@ private static boolean isValidStrict(String txt) {
 					BotHelper.sendMessageToTelegram(chatId, "No se encontró el proyecto con ID: " + proyectoId, this);
 				}
 			} else if (chatState.startsWith("WAITING_FOR_TASK_STATUS_UPDATE")) {
-				int tareaId = chatTareaIdMap.get(chatId);
+				//int tareaId = chatTareaIdMap.get(chatId);
+				int tareaId = chatStateService.getTareaId(chatId);
 				int id;
 				Tarea tarea = tareaService.getItemById(tareaId).getBody();
 				switch(messageTextFromTelegram){
@@ -389,7 +396,8 @@ private static boolean isValidStrict(String txt) {
 					break;
 				}
 			} else if (chatState.startsWith("WAITING_FOR_CREATING_TASK_DEVELOPER")) {
-				int sprintId = chatTareaIdMap.get(chatId); // Obtener el ID del sprint
+				//int sprintId = chatTareaIdMap.get(chatId); // Obtener el ID del sprint
+				int sprintId = chatStateService.getTareaId(chatId);
 				String dateContext;
 				
 				if (sprintId != 0) {
@@ -485,7 +493,8 @@ private static boolean isValidStrict(String txt) {
 					BotHelper.sendMessageToTelegram(chatId, "Task could not be created correctly. Please use the correct format:\n\nName\nDescription\nPriority (From 1 to 3)\nDue Date (YYYY-MM-DD)", this);
 				}
 			} else if (chatState.startsWith("WAITING_FOR_DONE_STATUS_REAL_HOURS")) {
-				int tareaId = chatTareaIdMap.get(chatId);
+				//int tareaId = chatTareaIdMap.get(chatId);
+				int tareaId = chatStateService.getTareaId(chatId);
 				Tarea tarea = tareaService.getItemById(tareaId).getBody();
 				int realHours;
 
@@ -508,8 +517,9 @@ private static boolean isValidStrict(String txt) {
 				}
 			} else if (chatState.startsWith("WAITING_FOR_MANAGER_UPDATE_TASK_")){
 				String field = chatState.replace("WAITING_FOR_MANAGER_UPDATE_TASK_", "");
-				int tareaId = chatTareaIdMap.get(chatId);
-	
+				//int tareaId = chatTareaIdMap.get(chatId);
+				int tareaId = chatStateService.getTareaId(chatId);
+
 				// Obtener la tarea actual
 				Tarea tareacopy = tareaService.getItemById(tareaId).getBody();
 				Tarea tarea = tareacopy;
@@ -1099,8 +1109,9 @@ private static boolean isValidStrict(String txt) {
 				Tarea tarea = tareaService.getItemById(tareaId).getBody();
 				if (tarea != null) {
 					// Guardar el menú anterior
-					chatPreviousMenuMap.put(chatId, "SHOW_NOT_ACCEPTED_TASKS");
-	
+					//chatPreviousMenuMap.put(chatId, "SHOW_NOT_ACCEPTED_TASKS");
+					chatStateService.savePreviousMenu(chatId, "SHOW_NOT_ACCEPTED_TASKS");
+
 					BotHelper.sendMessageToTelegram(chatId, "Task selected: " + tareaNombre + ".\n\nPlease select all the fields you want to modify before accepting the task.\n\nWhen you are done editing the task, click on Accept", this);
 	
 					// Mostrar el menú de modificación de la tarea
@@ -1199,7 +1210,8 @@ private static boolean isValidStrict(String txt) {
 					BotHelper.sendMessageToTelegram(chatId, "The task has been accepted successfully", this);
 
 					// Redirigir al menú anterior
-					String previousMenu = chatPreviousMenuMap.get(chatId);
+					//String previousMenu = chatPreviousMenuMap.get(chatId);
+					String previousMenu = chatStateService.getPreviousMenu(chatId);
 					if (previousMenu != null) {
 						if (previousMenu.equals("SHOW_NOT_ACCEPTED_TASKS")) {
 							showNotAcceptedTasks(chatId, idProyecto);
@@ -2988,14 +3000,16 @@ private static boolean isValidStrict(String txt) {
 	}
 
 	public void saveChatState(long chatId, String state, int tareaId) {
-		chatStateMap.put(chatId, state);
-		chatTareaIdMap.put(chatId, tareaId);
+		//chatStateMap.put(chatId, state);
+		//chatTareaIdMap.put(chatId, tareaId);
+		chatStateService.saveChatState(chatId, state, tareaId);
 	}
 
 	public void clearChatState(long chatId) {
-		chatStateMap.remove(chatId);
-		chatTareaIdMap.remove(chatId);
-		chatPreviousMenuMap.remove(chatId); // Limpiar también el menú anterior
+		//chatStateMap.remove(chatId);
+		//chatTareaIdMap.remove(chatId);
+		//chatPreviousMenuMap.remove(chatId); // Limpiar también el menú anterior
+		chatStateService.clearChatState(chatId);
 	}
 
 	private String idColumnaStringReturn(int idColumna){

@@ -18,8 +18,10 @@ import {
   SquareCheckBig,
   CalendarClock,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const AnalyticsSprint = () => {
+  const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState("ALL");
   const [selectedSprint, setSelectedSprint] = useState("Sprint1");
@@ -46,6 +48,7 @@ const AnalyticsSprint = () => {
   const [completedTasksPerSprint, setCompletedTasksPerSprint] = useState([]);
   const [totalStoryPoints, setTotalStoryPoints] = useState(0);
   const [totalWorkedHours, setTotalWorkedHours] = useState(0);
+  const [verification, setVerification] = useState(null);
 
   const fetchSprints = async () => {
     try {
@@ -316,7 +319,9 @@ const AnalyticsSprint = () => {
       });
       setKpiPerson(kpiRaw);
 
-      const localsprintKpiPerson = kpiRaw.filter((k) => k.sprint === selectedSprint);
+      const localsprintKpiPerson = kpiRaw.filter(
+        (k) => k.sprint === selectedSprint
+      );
       setSprintKpiPerson(localsprintKpiPerson);
       const kpiAggregated = localsprintKpiPerson.reduce((acc, cur) => {
         if (!acc[cur.name])
@@ -372,12 +377,41 @@ const AnalyticsSprint = () => {
     }
   };
 
+  const checkTokenAndFetchData = async () => {
+    try {
+      const response = await fetch("/pruebasUser/validarTokenManager", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // or however you store it
+        },
+      });
+
+      if (!response.ok) throw new Error("Token validation request failed");
+
+      const isValid = await response.json();
+      if (!isValid) {
+        navigate("/login");
+        return;
+      }
+      console.log("Verification completed");
+      setVerification(true);
+    } catch (error) {
+      navigate("/login");
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      await checkTokenAndFetchData();
+    };
+    init();
+  }, [checkTokenAndFetchData]);
+
   useEffect(() => {
     const init = async () => {
       await fetchProyectos();
     };
     init();
-  }, []);
+  }, [verification]);
 
   useEffect(() => {
     if (selectedProyecto != 0) {
@@ -446,10 +480,6 @@ const AnalyticsSprint = () => {
                 </option>
               ))}
             </select>
-            <div className="flex items-center gap-3">
-              <Bell className="text-white cursor-pointer hover:text-red-500" />
-              <UserCircle className="text-white w-8 h-8 cursor-pointer hover:text-red-500" />
-            </div>
           </div>
         </header>
 

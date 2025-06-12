@@ -2,11 +2,17 @@ import React, { useEffect, useState, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import { Bell, UserCircle, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, DragOverlay} from "@dnd-kit/core";
+import {
+  DndContext,
+  closestCenter,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  DragOverlay,
+} from "@dnd-kit/core";
 import SprintColumn from "./components/SprintColumn";
 import TaskChip from "./components/TaskChip";
 import CreateTaskDeveloperModal from "./components/CreateTaskDeveloperModal";
-
 
 const BacklogDeveloper = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -20,6 +26,7 @@ const BacklogDeveloper = () => {
   const [isChangingSprintStatus, setIsChangingSprintStatus] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [createTaskSprintId, setCreateTaskSprintId] = useState(null);
+  const [verification, setVerification] = useState(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
   const [activeTaskId, setActiveTaskId] = useState(null);
@@ -43,7 +50,7 @@ const BacklogDeveloper = () => {
     const targetSprint = sprints.find((s) => s.id === targetSprintId);
     const sourceSprint = sprints.find((s) => s.id === draggedTask.idSprint);
 
-      // Block if either sprint is completed
+    // Block if either sprint is completed
     if (targetSprint?.completado || sourceSprint?.completado) return;
 
     const updatedTask = {
@@ -59,27 +66,30 @@ const BacklogDeveloper = () => {
     );
 
     try {
-      const response = await fetch(`/pruebas/updateTarea/${draggedTask.rawId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idTarea: draggedTask.rawId,
-          idEncargado: draggedTask.idEncargado,
-          idProyecto: draggedTask.idProyecto,
-          idColumna: draggedTask.idColumna,
-          idSprint: targetSprintId,
-          nombre: draggedTask.title,
-          descripcion: draggedTask.description,
-          prioridad: draggedTask.prioridad,
-          fechaInicio: targetSprint?.fechaInicio || null,
-          fechaVencimiento: targetSprint?.fechaFin || null,
-          fechaCompletado: draggedTask.fechaCompletado,
-          storyPoints: draggedTask.storyPoints,
-          tiempoReal: draggedTask.tiempoReal,
-          tiempoEstimado: draggedTask.tiempoEstimado,
-          aceptada: draggedTask.aceptada,
-        }),
-      });
+      const response = await fetch(
+        `/pruebas/updateTarea/${draggedTask.rawId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            idTarea: draggedTask.rawId,
+            idEncargado: draggedTask.idEncargado,
+            idProyecto: draggedTask.idProyecto,
+            idColumna: draggedTask.idColumna,
+            idSprint: targetSprintId,
+            nombre: draggedTask.title,
+            descripcion: draggedTask.description,
+            prioridad: draggedTask.prioridad,
+            fechaInicio: targetSprint?.fechaInicio || null,
+            fechaVencimiento: targetSprint?.fechaFin || null,
+            fechaCompletado: draggedTask.fechaCompletado,
+            storyPoints: draggedTask.storyPoints,
+            tiempoReal: draggedTask.tiempoReal,
+            tiempoEstimado: draggedTask.tiempoEstimado,
+            aceptada: draggedTask.aceptada,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
@@ -102,7 +112,6 @@ const BacklogDeveloper = () => {
       );
     }
   };
-
 
   const fetchTasks = useCallback(async () => {
     const userId = JSON.parse(localStorage.getItem("userId"));
@@ -132,13 +141,18 @@ const BacklogDeveloper = () => {
           tiempoEstimado: task.tiempoEstimado,
           prioridad: task.prioridad,
           aceptada: task.aceptada,
-          type: task.prioridad === 1 ? "Low" : task.prioridad === 2 ? "Medium" : "High",
+          type:
+            task.prioridad === 1
+              ? "Low"
+              : task.prioridad === 2
+              ? "Medium"
+              : "High",
         };
         newTasks.push(taskObj);
       });
 
       setTasks(newTasks);
-      setAllTasks(newTasks);  // Save full list
+      setAllTasks(newTasks); // Save full list
       console.log(newTasks);
     } catch (err) {
       console.error(err);
@@ -154,17 +168,16 @@ const BacklogDeveloper = () => {
     try {
       const res = await fetch(`/pruebasSprint/SprintsForUser/${userId}`);
       const data = await res.json();
-      
+
       // Ensure we get valid sprint data
-      const validSprints = data.filter(sprint => 
-        sprint && sprint.id !== undefined && sprint.id !== null
+      const validSprints = data.filter(
+        (sprint) => sprint && sprint.id !== undefined && sprint.id !== null
       );
-      
+
       // Log valid sprints for debugging
       console.log("Fetched sprints:", validSprints);
-      
+
       setSprints(validSprints);
-      
     } catch (err) {
       console.error("Failed to fetch sprints", err);
     }
@@ -176,31 +189,61 @@ const BacklogDeveloper = () => {
     try {
       const res = await fetch(`/pruebasProy/ProyectoUsuario/${userId}`);
       const data = await res.json();
-      
+
       // Log valid sprints for debugging
       console.log("Fetched proyecto:", data);
-      
+
       setSelectedProyecto(data);
-      
     } catch (err) {
       console.error("Failed to fetch proyecto", err);
     }
   }, []);
 
+  const checkTokenAndFetchData = async () => {
+    try {
+      const response = await fetch("/pruebasUser/validarTokenDeveloper", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // or however you store it
+        },
+      });
+
+      if (!response.ok) throw new Error("Token validation request failed");
+
+      const isValid = await response.json();
+      if (!isValid) {
+        navigate("/login");
+        return;
+      }
+      console.log("Verification completed");
+      setVerification(true);
+    } catch (error) {
+      navigate("/login");
+    }
+  };
+
   useEffect(() => {
-      const init = async () => {
+    const init = async () => {
+      await checkTokenAndFetchData();
+    };
+    init();
+  }, [checkTokenAndFetchData]);
+
+  useEffect(() => {
+    const init = async () => {
+      if (verification === true) {
         await fetchProyecto();
         await fetchSprints();
         await fetchTasks();
-      };
-      init();
-    }, []);
+      }
+    };
+    init();
+  }, [verification]);
 
   const handleOpenCreateTaskModel = (sprintId) => {
-    console.log("Changing createTaskSprintId")
+    console.log("Changing createTaskSprintId");
     setCreateTaskSprintId(sprintId.id);
     setIsCreatingTask(true);
-  }
+  };
 
   const handleAddTask = async (newTask) => {
     const taskPayload = {
@@ -237,20 +280,17 @@ const BacklogDeveloper = () => {
     }
   };
 
-
   return (
     <div className="flex h-screen bg-[#1a1a1a]">
-      <Sidebar isMobileOpen={isMobileOpen} closeMobile={() => setIsMobileOpen(false)} />
+      <Sidebar
+        isMobileOpen={isMobileOpen}
+        closeMobile={() => setIsMobileOpen(false)}
+      />
 
       <div className="flex-1 px-4 md:px-6 lg:px-8 overflow-y-auto">
         <header className="flex flex-wrap items-center justify-between py-4 gap-4">
           <h1 className="text-white text-2xl font-semibold">Backlog</h1>
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="flex items-center gap-3">
-              <Bell className="text-white cursor-pointer hover:text-red-500" />
-              <UserCircle className="text-white w-8 h-8 cursor-pointer hover:text-red-500" />
-            </div>
-          </div>
+          <div className="flex flex-wrap gap-3 items-center"></div>
         </header>
 
         <DndContext
@@ -261,8 +301,11 @@ const BacklogDeveloper = () => {
         >
           <div className="space-y-6">
             {sprints.map((sprint, index) => {
-              const isLastSprint = sprint.completado === false && completadoFlag;
-              if(isLastSprint){completadoFlag = false;}
+              const isLastSprint =
+                sprint.completado === false && completadoFlag;
+              if (isLastSprint) {
+                completadoFlag = false;
+              }
 
               return (
                 <SprintColumn
@@ -295,7 +338,7 @@ const BacklogDeveloper = () => {
                 fechaInicio: "-",
                 fechaFin: "-",
                 completado: false,
-                deleted: false
+                deleted: false,
               }}
             >
               {tasks
@@ -326,12 +369,10 @@ const BacklogDeveloper = () => {
               }}
             />
           )}
-
         </DndContext>
       </div>
     </div>
   );
-
 };
 
 export default BacklogDeveloper;

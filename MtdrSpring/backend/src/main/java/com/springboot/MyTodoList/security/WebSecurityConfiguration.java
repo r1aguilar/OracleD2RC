@@ -41,11 +41,15 @@ public class WebSecurityConfiguration {
                     new AntPathRequestMatcher("/pruebasProy/**"),
                     new AntPathRequestMatcher("/pruebasSprint/**"),
                     new AntPathRequestMatcher("/auth/**"),
-                    new AntPathRequestMatcher("/dashboard"),
-                    new AntPathRequestMatcher("/registro"),
+                    new AntPathRequestMatcher("/dashdev"),
+                    new AntPathRequestMatcher("/dashmanager"),
                     new AntPathRequestMatcher("/login"),
+                    new AntPathRequestMatcher("/register"),
                     new AntPathRequestMatcher("/backlogMan"),
-                    new AntPathRequestMatcher("/dashManager"),
+                    new AntPathRequestMatcher("/backlogDev"),
+                    new AntPathRequestMatcher("/profileManager"),
+                    new AntPathRequestMatcher("/profileDev"),
+                    new AntPathRequestMatcher("/analytics"),
                     new AntPathRequestMatcher("/analyticssprint")
                 ).permitAll()
                 .anyRequest().authenticated()

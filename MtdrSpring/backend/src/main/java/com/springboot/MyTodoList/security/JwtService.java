@@ -70,6 +70,17 @@ public class JwtService {
         return isUsernameValid && isNotExpired && isTokenStored;
     }
 
+    public boolean expiresInLessThan30Minutes(String token) {
+    try {
+        Date expiration = extractExpiration(token);
+        long timeUntilExpiration = expiration.getTime() - System.currentTimeMillis();
+        long thirtyMinutesInMillis = 30 * 60 * 1000;
+        return timeUntilExpiration < thirtyMinutesInMillis;
+    } catch (Exception e) {
+        return true; // If token is invalid or any error occurs, treat it as expiring soon
+    }
+}
+
     private boolean isTokenExpired(String token){
         return extractExpiration(token).before(new Date());
     }
